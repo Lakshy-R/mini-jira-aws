@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { useAuthStore } from './store/auth.store';
 import { useEffect, useState } from 'react';
 import api from './services/api';
@@ -17,6 +18,12 @@ export default function App() {
       <h1>Dashboard</h1>
 
       <p>{message}</p>
+
+      <nav style={{ marginBottom: 20 }}>
+        <Link to="/kanban" style={{ padding: '10px 20px', background: '#007bff', color: 'white', borderRadius: 4, textDecoration: 'none' }}>
+          Go to Kanban Board
+        </Link>
+      </nav>
 
       <h3>User Info:</h3>
       <pre>{JSON.stringify(user, null, 2)}</pre>

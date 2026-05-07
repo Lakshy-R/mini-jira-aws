@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
 import App from '../App';
 import LoginPage from '../pages/LoginPage';
+import KanbanPage from '../pages/KanbanPage';
 import ProtectedRoute from './ProtectedRoute';
 
 export default function Router() {
@@ -12,6 +13,7 @@ export default function Router() {
 
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<App />} />
+          <Route path="/kanban" element={<KanbanPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

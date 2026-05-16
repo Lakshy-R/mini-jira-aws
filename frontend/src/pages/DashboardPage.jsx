@@ -6,6 +6,8 @@ import { useTasksStore } from '../store/tasks.store';
 
 import KanbanBoard from '../components/kanban/KanbanBoard';
 
+import TaskForm from '../components/tasks/TaskForm';
+
 export default function DashboardPage() {
     const { tasks, setTasks } =
         useTasksStore();
@@ -30,6 +32,8 @@ export default function DashboardPage() {
             <h1 className="text-3xl font-bold mb-6">
                 Mini Jira Dashboard
             </h1>
+
+            <TaskForm onTaskCreated={loadTasks} />
 
             <KanbanBoard tasks={tasks} />
         </div>

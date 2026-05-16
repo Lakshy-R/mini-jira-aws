@@ -1,3 +1,5 @@
+import TaskCard from './TaskCard';
+
 export default function KanbanColumn({
     title,
     tasks,
@@ -8,24 +10,12 @@ export default function KanbanColumn({
                 {title}
             </h2>
 
-            <div className="space-y-3">
-                {tasks.map((task) => (
-                    <div
+            <div className="space-y-4">
+                {tasks.map(task => (
+                    <TaskCard
                         key={task.taskId}
-                        className="bg-white p-3 rounded-lg shadow"
-                    >
-                        <h3 className="font-semibold">
-                            {task.title}
-                        </h3>
-
-                        <p className="text-sm text-gray-500">
-                            {task.description}
-                        </p>
-
-                        <div className="mt-2 text-xs">
-                            Priority: {task.priority}
-                        </div>
-                    </div>
+                        task={task}
+                    />
                 ))}
             </div>
         </div>

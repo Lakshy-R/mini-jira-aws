@@ -16,9 +16,9 @@ export default function DashboardPage() {
         loadTasks();
     }, []);
 
-    const handleCreateTask = async (taskData) => {
+    const handleCreateTask = async (taskData, imageFile) => {
         try {
-            await tasksService.createTask(taskData);
+            await tasksService.createTask(taskData, imageFile);
 
             await loadTasks();
         } catch (err) {

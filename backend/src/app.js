@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { authMiddleware } from './middleware/auth.middleware.js';
 import tasksRouter from './modules/tasks/tasks.router.js';
+import projectsRouter from './modules/projects/projects.router.js';
 
 const app = express();
 
@@ -16,6 +17,7 @@ app.use(
 app.use(helmet());
 app.use(express.json());
 
+app.use('/api/projects', projectsRouter);
 app.use('/api/tasks', tasksRouter);
 
 // ❌ DO NOT apply globally yet (we will refine later)

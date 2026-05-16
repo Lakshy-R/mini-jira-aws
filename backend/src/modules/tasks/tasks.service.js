@@ -1,12 +1,28 @@
 import { tasksRepository } from './tasks.repository.js';
 
+import { v4 as uuid } from 'uuid';
+
 export const tasksService = {
     async createTask(data, user) {
         return await tasksRepository.create({
-            ...data,
+            taskId: uuid(),
+
+            title: data.title,
+            description: data.description,
+
+            status: 'TODO',
+            priority: data.priority,
+
+            teamId: data.teamId,
+            assigneeId: data.assigneeId,
+
+            projectId: data.projectId,
+
             createdBy: user.sub,
             managerId: user.sub,
-            teamId: data.teamId,
+
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
         });
     },
 

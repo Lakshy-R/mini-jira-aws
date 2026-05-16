@@ -1,12 +1,15 @@
 import { useState } from 'react';
 
-export default function TaskForm({ onTaskCreated }) {
+export default function TaskForm({
+    onTaskCreated,
+}) {
     const [form, setForm] = useState({
         title: '',
         description: '',
         priority: 'MEDIUM',
         teamId: '',
         assigneeId: '',
+        projectId: '',
     });
 
     const handleChange = (e) => {
@@ -27,6 +30,7 @@ export default function TaskForm({ onTaskCreated }) {
             priority: 'MEDIUM',
             teamId: '',
             assigneeId: '',
+            projectId: '',
         });
     };
 
@@ -63,8 +67,14 @@ export default function TaskForm({ onTaskCreated }) {
                 className="border p-2 rounded w-full"
             >
                 <option value="LOW">LOW</option>
-                <option value="MEDIUM">MEDIUM</option>
-                <option value="HIGH">HIGH</option>
+
+                <option value="MEDIUM">
+                    MEDIUM
+                </option>
+
+                <option value="HIGH">
+                    HIGH
+                </option>
             </select>
 
             <input
@@ -81,6 +91,15 @@ export default function TaskForm({ onTaskCreated }) {
                 name="assigneeId"
                 placeholder="Assignee ID"
                 value={form.assigneeId}
+                onChange={handleChange}
+                className="border p-2 rounded w-full"
+            />
+
+            <input
+                type="text"
+                name="projectId"
+                placeholder="Project ID"
+                value={form.projectId}
                 onChange={handleChange}
                 className="border p-2 rounded w-full"
             />

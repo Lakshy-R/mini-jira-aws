@@ -1,0 +1,20 @@
+{
+    "LambdaFunctionConfigurations":  [
+                                         {
+                                             "Filter":  {
+                                                            "Key":  {
+                                                                        "FilterRules":  [
+                                                                                            {
+                                                                                                "Value":  "task-images/",
+                                                                                                "Name":  "prefix"
+                                                                                            }
+                                                                                        ]
+                                                                    }
+                                                        },
+                                             "Events":  [
+                                                            "s3:ObjectCreated:Put"
+                                                        ],
+                                             "LambdaFunctionArn":  "arn:aws:lambda:eu-north-1:108379845890:function:mini-jira-image-resize"
+                                         }
+                                     ]
+}

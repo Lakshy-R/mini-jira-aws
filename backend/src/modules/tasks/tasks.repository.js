@@ -20,6 +20,7 @@ export const tasksRepository = {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             status: 'TODO',
+            imageVersions: data.imageUrl ? [data.imageUrl] : [],
             ...data,
         };
 
@@ -87,6 +88,37 @@ export const tasksRepository = {
             })
         );
 
+        return result.Attributes;
+    },
+
+    async updateImage(taskId, newImageUrl) {
+        const existing = await this.getById(taskId);
+        if (!existing) return null;
+
+        const versions = Array.isArray(existing.imageVersions)
+            ? existing.imageVersions
+            : existing.imageUrl
+            ? [existing.imageUrl]
+            : [];
+
+        if (existing.imageUrl && existing.imageUrl !== newImageUrl) {
+            versions.push(existing.imageUrl);
+        }
+
+        const result = await ddb.send(
+            new UpdateCommand({
+                TableName: TABLE,
+                Key: { taskId },
+                UpdateExpression:
+                    'SET imageUrl = :url, imageVersions = :versions, updatedAt = :now',
+                ExpressionAttributeValues: {
+                    ':url': newImageUrl,
+                    ':versions': versions,
+                    ':now': new Date().toISOString(),
+                },
+                ReturnValues: 'ALL_NEW',
+            })
+        );
         return result.Attributes;
     },
 

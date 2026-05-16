@@ -74,6 +74,33 @@ export const tasksController = {
         }
     },
 
+    async updateImage(req, res) {
+        try {
+            if (!req.file) {
+                return res.status(400).json({ message: 'No image file provided.' });
+            }
+
+            const updated = await tasksService.updateTaskImage(
+                req.params.id,
+                req.file.location,
+                req.user
+            );
+
+            if (!updated) {
+                return res.status(404).json({ message: 'Task not found.' });
+            }
+
+            res.status(200).json({
+                message: 'Task image updated.',
+                imageUrl: updated.imageUrl,
+                imageVersions: updated.imageVersions,
+            });
+        } catch (err) {
+            console.error('[Tasks] updateImage error:', err);
+            res.status(500).json({ message: 'Failed to update task image.' });
+        }
+    },
+
     async delete(req, res) {
         try {
             await tasksService.deleteTask(req.params.id);

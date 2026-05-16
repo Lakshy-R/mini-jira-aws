@@ -4,6 +4,9 @@ import helmet from 'helmet';
 import { authMiddleware } from './middleware/auth.middleware.js';
 import tasksRouter from './modules/tasks/tasks.router.js';
 import projectsRouter from './modules/projects/projects.router.js';
+import uploadRouter from './modules/upload/upload.router.js';
+
+import { multerErrorHandler } from './modules/upload/upload.controller.js';
 
 const app = express();
 
@@ -19,6 +22,7 @@ app.use(express.json());
 
 app.use('/api/projects', projectsRouter);
 app.use('/api/tasks', tasksRouter);
+app.use('/api/upload', uploadRouter);
 
 // ❌ DO NOT apply globally yet (we will refine later)
 // app.use(authMiddleware);
@@ -34,5 +38,8 @@ app.get('/api/health', (req, res) => {
 app.get('/api/me', authMiddleware, (req, res) => {
   res.json(req.user);
 });
+
+// Add multer error handler
+app.use(multerErrorHandler);
 
 export default app;

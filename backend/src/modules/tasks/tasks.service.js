@@ -1,6 +1,7 @@
 import { tasksRepository } from './tasks.repository.js';
 
 import { v4 as uuid } from 'uuid';
+import { deleteFromS3 } from '../../lib/s3.js';
 
 export const tasksService = {
     async createTask(data, user) {
@@ -20,6 +21,8 @@ export const tasksService = {
 
             createdBy: user.sub,
             managerId: user.sub,
+
+            imageUrl: data.imageUrl || null,
 
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
@@ -63,9 +66,21 @@ export const tasksService = {
         );
     },
 
+    async updateTaskImage(taskId, newImageUrl, user) {
+        const task = await this.getTaskById(taskId);
+        if (!task) return null;
+
+        return await tasksRepository.updateImage(taskId, newImageUrl);
+    },
+
     async deleteTask(taskId) {
-        return await tasksRepository.delete(
-            taskId
-        );
+        const task = await tasksRepository.getById(taskId);
+        if (!task) return false;
+
+        if (task.imageUrl) {
+            await deleteFromS3(task.imageUrl);
+        }
+
+        return await tasksRepository.delete(taskId);
     },
 };

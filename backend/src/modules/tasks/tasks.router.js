@@ -5,6 +5,7 @@ import { tasksController } from './tasks.controller.js';
 import { authMiddleware } from '../../middleware/auth.middleware.js';
 
 import { requireRole } from '../../middleware/rbac.middleware.js';
+import { upload } from '../../lib/s3.js';
 
 const router = express.Router();
 
@@ -28,6 +29,13 @@ router.post(
 router.patch(
     '/:id/status',
     tasksController.updateStatus
+);
+
+// UPDATE task image
+router.patch(
+    '/:id/image',
+    upload.single('image'),
+    tasksController.updateImage
 );
 
 // DELETE task

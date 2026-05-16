@@ -38,9 +38,9 @@ export default function DashboardPage() {
     };
 
     return (
-        <div className="p-6">
-            <h1 className="text-3xl font-bold mb-6">
-                Mini Jira Dashboard
+        <div>
+            <h1 className="text-3xl font-bold mb-6 text-gray-900">
+                Kanban Board
             </h1>
 
             <TaskForm onTaskCreated={handleCreateTask} />

@@ -7,7 +7,8 @@ import {
 
 import LoginPage from '../pages/LoginPage';
 import DashboardPage from '../pages/DashboardPage';
-
+import ProjectsPage from '../pages/ProjectsPage';
+import AppLayout from '../components/layout/AppLayout';
 import { useAuthStore } from '../store/auth.store';
 
 function ProtectedRoute({ children }) {
@@ -19,7 +20,7 @@ function ProtectedRoute({ children }) {
     return <Navigate to="/" />;
   }
 
-  return children;
+  return <AppLayout>{children}</AppLayout>;
 }
 
 export default function AppRouter() {
@@ -36,6 +37,15 @@ export default function AppRouter() {
           element={
             <ProtectedRoute>
               <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/projects"
+          element={
+            <ProtectedRoute>
+              <ProjectsPage />
             </ProtectedRoute>
           }
         />

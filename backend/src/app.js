@@ -28,4 +28,9 @@ app.get('/api/health', (req, res) => {
   });
 });
 
+// 🔍 Debug: inspect what your token contains
+app.get('/api/me', authMiddleware, (req, res) => {
+  res.json(req.user);
+});
+
 export default app;

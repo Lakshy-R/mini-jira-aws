@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export default function TaskForm({ onCreate }) {
+export default function TaskForm({ onTaskCreated }) {
     const [form, setForm] = useState({
         title: '',
         description: '',
@@ -19,7 +19,7 @@ export default function TaskForm({ onCreate }) {
     const handleSubmit = async (e) => {
         e.preventDefault();
 
-        await onCreate(form);
+        await onTaskCreated(form);
 
         setForm({
             title: '',

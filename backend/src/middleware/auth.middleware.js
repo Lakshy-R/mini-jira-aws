@@ -5,9 +5,9 @@ try {
   verifier = CognitoJwtVerifier.create({
     userPoolId: process.env.COGNITO_USER_POOL_ID,
     clientId: process.env.COGNITO_CLIENT_ID,
-    tokenUse: 'access',
+    tokenUse: 'id', // ID token contains custom attributes (role, teamId)
   });
-  console.log('Cognito Verifier created successfully');
+  console.log('Cognito Verifier created successfully (ID token)');
 } catch (error) {
   console.error('Error creating Cognito Verifier:', error.message);
 }
@@ -33,6 +33,7 @@ export const authMiddleware = async (req, res, next) => {
 
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Invalid token' });
+    console.error('Token verification error:', err);
+    return res.status(401).json({ error: 'Invalid token', details: err.message });
   }
 };

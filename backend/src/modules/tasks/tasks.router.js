@@ -18,6 +18,9 @@ router.get('/', tasksController.getAll);
 // GET single task
 router.get('/:id', tasksController.getOne);
 
+// GET presigned image URL for a task's private S3 image
+router.get('/:id/image-url', tasksController.getImageUrl);
+
 // CREATE task
 router.post(
     '/',

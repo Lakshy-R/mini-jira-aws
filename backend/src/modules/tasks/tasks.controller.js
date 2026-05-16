@@ -1,4 +1,6 @@
 import { tasksService } from './tasks.service.js';
+import { tasksRepository } from './tasks.repository.js';
+import { getSignedImageUrl } from '../../lib/s3.js';
 
 export const tasksController = {
     async create(req, res) {
@@ -114,6 +116,19 @@ export const tasksController = {
             res.status(500).json({
                 error: err.message,
             });
+        }
+    },
+
+    async getImageUrl(req, res) {
+        try {
+            const task = await tasksRepository.getById(req.params.id);
+            if (!task) return res.status(404).json({ error: 'Task not found' });
+
+            const signedUrl = await getSignedImageUrl(task.imageUrl);
+            res.json({ url: signedUrl });
+        } catch (err) {
+            console.error('[Tasks] getImageUrl error:', err);
+            res.status(500).json({ error: 'Failed to generate image URL.' });
         }
     },
 };

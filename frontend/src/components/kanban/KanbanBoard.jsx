@@ -16,6 +16,7 @@ const STATUSES = [
 export default function KanbanBoard({
     tasks,
     reloadTasks,
+    onTaskClick,
 }) {
     const handleDragEnd = async ({
         active,
@@ -52,6 +53,7 @@ export default function KanbanBoard({
                         tasks={tasks.filter(
                             t => t.status === status
                         )}
+                        onTaskClick={onTaskClick}
                     />
                 ))}
             </div>

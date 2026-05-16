@@ -1,4 +1,5 @@
-import { S3Client, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import multer from 'multer';
 import multerS3 from 'multer-s3';
 import path from 'path';
@@ -58,5 +59,28 @@ export const deleteFromS3 = async (urlOrKey) => {
     );
   } catch (err) {
     console.error('[S3] deleteFromS3 failed:', err.message);
+  }
+};
+
+/**
+ * Generates a short-lived presigned URL for a private S3 object.
+ * urlOrKey can be a full S3 URL or just the object key.
+ */
+export const getSignedImageUrl = async (urlOrKey, bucket = process.env.S3_ORIGINALS_BUCKET, expiresIn = 3600) => {
+  if (!urlOrKey) return null;
+  try {
+    let key = urlOrKey;
+    if (urlOrKey.startsWith('https://')) {
+      const url = new URL(urlOrKey);
+      key = decodeURIComponent(url.pathname.slice(1));
+    }
+    return await getSignedUrl(
+      s3Client,
+      new GetObjectCommand({ Bucket: bucket, Key: key }),
+      { expiresIn }
+    );
+  } catch (err) {
+    console.error('[S3] getSignedImageUrl failed:', err.message);
+    return null;
   }
 };

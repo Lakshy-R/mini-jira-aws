@@ -5,6 +5,7 @@ import { authMiddleware } from './middleware/auth.middleware.js';
 import tasksRouter from './modules/tasks/tasks.router.js';
 import projectsRouter from './modules/projects/projects.router.js';
 import uploadRouter from './modules/upload/upload.router.js';
+import commentsRouter from './modules/comments/comments.router.js';
 
 import { multerErrorHandler } from './modules/upload/upload.controller.js';
 
@@ -22,6 +23,7 @@ app.use(express.json());
 
 app.use('/api/projects', projectsRouter);
 app.use('/api/tasks', tasksRouter);
+app.use('/api/tasks/:taskId/comments', commentsRouter);
 app.use('/api/upload', uploadRouter);
 
 // ❌ DO NOT apply globally yet (we will refine later)

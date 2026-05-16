@@ -1,7 +1,7 @@
 import { tasksRepository } from './tasks.repository.js';
 
 import { v4 as uuid } from 'uuid';
-import { deleteFromS3 } from '../../lib/s3.js';
+import { deleteFromS3, getSignedImageUrl } from '../../lib/s3.js';
 
 export const tasksService = {
     async createTask(data, user) {
@@ -30,30 +30,37 @@ export const tasksService = {
     },
 
     async getTasks(user) {
+        let tasks = [];
         // Employee → only own team
-        if (
-            user?.role !== 'manager' &&
-            user?.teamId
-        ) {
-            const result =
-                await tasksRepository.getByTeam(
-                    user.teamId
-                );
-
-            return result.Items || [];
+        if (user?.role !== 'manager' && user?.teamId) {
+            const result = await tasksRepository.getByTeam(user.teamId);
+            tasks = result.Items || [];
+        } else {
+            // Manager → all tasks
+            const result = await tasksRepository.getAll();
+            tasks = result.Items || [];
         }
 
-        // Manager → all tasks
-        const result =
-            await tasksRepository.getAll();
-
-        return result.Items || [];
+        return await Promise.all(tasks.map(async (task) => {
+            const urlOrKey = task.thumbnailUrl || task.imageUrl;
+            if (urlOrKey) {
+                const bucket = task.thumbnailUrl ? process.env.S3_RESIZED_BUCKET : process.env.S3_ORIGINALS_BUCKET;
+                task.presignedUrl = await getSignedImageUrl(urlOrKey, bucket);
+            }
+            return task;
+        }));
     },
 
     async getTaskById(taskId) {
-        return await tasksRepository.getById(
-            taskId
-        );
+        const task = await tasksRepository.getById(taskId);
+        if (task) {
+            const urlOrKey = task.thumbnailUrl || task.imageUrl;
+            if (urlOrKey) {
+                const bucket = task.thumbnailUrl ? process.env.S3_RESIZED_BUCKET : process.env.S3_ORIGINALS_BUCKET;
+                task.presignedUrl = await getSignedImageUrl(urlOrKey, bucket);
+            }
+        }
+        return task;
     },
 
     async updateTaskStatus(

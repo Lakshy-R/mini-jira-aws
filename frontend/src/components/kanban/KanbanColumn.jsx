@@ -5,6 +5,7 @@ export default function KanbanColumn({
     title,
     status,
     tasks,
+    onTaskClick,
 }) {
     const { setNodeRef } = useDroppable({
         id: status,
@@ -24,6 +25,7 @@ export default function KanbanColumn({
                     <TaskCard
                         key={task.taskId}
                         task={task}
+                        onClick={() => onTaskClick(task)}
                     />
                 ))}
             </div>

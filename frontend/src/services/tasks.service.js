@@ -22,6 +22,22 @@ export const tasksService = {
     const res = await api.delete(`/tasks/${taskId}`);
     return res.data;
   },
+
+  // --- Comments ---
+  async getComments(taskId) {
+    const res = await api.get(`/tasks/${taskId}/comments`);
+    return res.data;
+  },
+
+  async postComment(taskId, content) {
+    const res = await api.post(`/tasks/${taskId}/comments`, { content });
+    return res.data;
+  },
+
+  async deleteComment(taskId, commentId) {
+    const res = await api.delete(`/tasks/${taskId}/comments/${commentId}`);
+    return res.data;
+  },
 };
 
 export const createTask = async (taskData, imageFile) => {
@@ -30,10 +46,14 @@ export const createTask = async (taskData, imageFile) => {
   if (imageFile) {
     const formData = new FormData();
     formData.append('image', imageFile);
-    const uploadRes = await api.post('/upload/task-image', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-    imageUrl = uploadRes.data.imageUrl;
+    try {
+      const uploadRes = await api.post('/upload/task-image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      imageUrl = uploadRes.data.imageUrl;
+    } catch (uploadErr) {
+      console.error("Image upload failed:", uploadErr);
+    }
   }
 
   // 2. Create task

@@ -1,0 +1,9 @@
+{
+  "name": "assignment-worker",
+  "version": "1.0.0",
+  "main": "index.mjs",
+  "type": "module",
+  "dependencies": {
+    "uuid": "^9.0.1"
+  }
+}

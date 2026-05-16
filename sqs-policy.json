@@ -1,0 +1,18 @@
+{
+  "Version": "2012-10-17",
+  "Id": "sqspolicy",
+  "Statement": [
+    {
+      "Sid": "First",
+      "Effect": "Allow",
+      "Principal": "*",
+      "Action": "sqs:SendMessage",
+      "Resource": "arn:aws:sqs:eu-north-1:108379845890:TaskAssignmentsQueue",
+      "Condition": {
+        "ArnEquals": {
+          "aws:SourceArn": "arn:aws:sns:eu-north-1:108379845890:TaskAssignmentsTopic"
+        }
+      }
+    }
+  ]
+}

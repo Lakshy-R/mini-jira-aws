@@ -1,32 +1,32 @@
 import { tasksRepository } from './tasks.repository.js';
-
 import { v4 as uuid } from 'uuid';
 import { deleteFromS3, getSignedImageUrl } from '../../lib/s3.js';
+import { publishTaskAssignment } from '../../lib/sns.js';
 
 export const tasksService = {
     async createTask(data, user) {
-        return await tasksRepository.create({
+        const task = await tasksRepository.create({
             taskId: uuid(),
-
             title: data.title,
             description: data.description,
-
             status: 'TODO',
             priority: data.priority,
-
             teamId: data.teamId,
             assigneeId: data.assigneeId,
-
             projectId: data.projectId,
-
             createdBy: user.sub,
             managerId: user.sub,
-
             imageUrl: data.imageUrl || null,
-
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         });
+
+        // Trigger SNS fan-out if task has an assignee
+        if (task.assigneeId) {
+            await publishTaskAssignment(task);
+        }
+
+        return task;
     },
 
     async getTasks(user) {

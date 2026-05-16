@@ -1,6 +1,13 @@
-import { signIn, fetchAuthSession, getCurrentUser } from 'aws-amplify/auth';
+import { signIn, signOut, fetchAuthSession, getCurrentUser } from 'aws-amplify/auth';
 
 export const login = async (email, password) => {
+  // Clear any stale Cognito session before signing in
+  try {
+    await signOut();
+  } catch (_) {
+    // No active session — that's fine, carry on
+  }
+
   const { isSignedIn, nextStep } = await signIn({
     username: email,
     password,
@@ -14,4 +21,5 @@ export const login = async (email, password) => {
   }
 
   return { isSignedIn, nextStep, user: null, token: null };
-};
+};
+

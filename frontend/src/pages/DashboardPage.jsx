@@ -16,6 +16,16 @@ export default function DashboardPage() {
         loadTasks();
     }, []);
 
+    const handleCreateTask = async (taskData) => {
+        try {
+            await tasksService.createTask(taskData);
+
+            await loadTasks();
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
     const loadTasks = async () => {
         try {
             const data =
@@ -33,7 +43,7 @@ export default function DashboardPage() {
                 Mini Jira Dashboard
             </h1>
 
-            <TaskForm onTaskCreated={loadTasks} />
+            <TaskForm onTaskCreated={handleCreateTask} />
 
             <KanbanBoard tasks={tasks} reloadTasks={loadTasks} />
         </div>

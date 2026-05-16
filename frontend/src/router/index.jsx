@@ -1,20 +1,44 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+} from 'react-router-dom';
 
-import App from '../App';
 import LoginPage from '../pages/LoginPage';
-import KanbanPage from '../pages/KanbanPage';
-import ProtectedRoute from './ProtectedRoute';
+import DashboardPage from '../pages/DashboardPage';
 
-export default function Router() {
+import { useAuthStore } from '../store/auth.store';
+
+function ProtectedRoute({ children }) {
+  const token = useAuthStore(
+    (state) => state.token
+  );
+
+  if (!token) {
+    return <Navigate to="/" />;
+  }
+
+  return children;
+}
+
+export default function AppRouter() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/login" element={<LoginPage />} />
+        <Route
+          path="/"
+          element={<LoginPage />}
+        />
 
-        <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<App />} />
-          <Route path="/kanban" element={<KanbanPage />} />
-        </Route>
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <DashboardPage />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </BrowserRouter>
   );

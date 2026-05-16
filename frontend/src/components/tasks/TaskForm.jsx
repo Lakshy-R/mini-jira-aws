@@ -1,46 +1,39 @@
 import { useState } from 'react';
-import { tasksService } from '../../services/tasks.service';
 
-export default function TaskForm({ onTaskCreated }) {
+export default function TaskForm({ onCreate }) {
     const [form, setForm] = useState({
         title: '',
         description: '',
         priority: 'MEDIUM',
-        teamId: 'frontend',
-        assigneeId: 'sara',
+        teamId: '',
+        assigneeId: '',
     });
 
-    const handleChange = e => {
+    const handleChange = (e) => {
         setForm({
             ...form,
             [e.target.name]: e.target.value,
         });
     };
 
-    const handleSubmit = async e => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
 
-        try {
-            await tasksService.createTask(form);
+        await onCreate(form);
 
-            setForm({
-                title: '',
-                description: '',
-                priority: 'MEDIUM',
-                teamId: 'frontend',
-                assigneeId: 'sara',
-            });
-
-            onTaskCreated();
-        } catch (err) {
-            console.error(err);
-        }
+        setForm({
+            title: '',
+            description: '',
+            priority: 'MEDIUM',
+            teamId: '',
+            assigneeId: '',
+        });
     };
 
     return (
         <form
             onSubmit={handleSubmit}
-            className="border p-4 rounded-xl shadow mb-6 space-y-4"
+            className="bg-white p-4 rounded-xl shadow mb-6 space-y-4"
         >
             <h2 className="text-xl font-bold">
                 Create Task
@@ -49,10 +42,10 @@ export default function TaskForm({ onTaskCreated }) {
             <input
                 type="text"
                 name="title"
-                placeholder="Title"
+                placeholder="Task title"
                 value={form.title}
                 onChange={handleChange}
-                className="border p-2 w-full rounded"
+                className="border p-2 rounded w-full"
             />
 
             <textarea
@@ -60,19 +53,37 @@ export default function TaskForm({ onTaskCreated }) {
                 placeholder="Description"
                 value={form.description}
                 onChange={handleChange}
-                className="border p-2 w-full rounded"
+                className="border p-2 rounded w-full"
             />
 
             <select
                 name="priority"
                 value={form.priority}
                 onChange={handleChange}
-                className="border p-2 w-full rounded"
+                className="border p-2 rounded w-full"
             >
                 <option value="LOW">LOW</option>
                 <option value="MEDIUM">MEDIUM</option>
                 <option value="HIGH">HIGH</option>
             </select>
+
+            <input
+                type="text"
+                name="teamId"
+                placeholder="Team ID"
+                value={form.teamId}
+                onChange={handleChange}
+                className="border p-2 rounded w-full"
+            />
+
+            <input
+                type="text"
+                name="assigneeId"
+                placeholder="Assignee ID"
+                value={form.assigneeId}
+                onChange={handleChange}
+                className="border p-2 rounded w-full"
+            />
 
             <button
                 type="submit"

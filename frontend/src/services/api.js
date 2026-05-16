@@ -1,20 +1,17 @@
 import axios from 'axios';
-import { fetchAuthSession } from 'aws-amplify/auth';
+
+import { useAuthStore } from '../store/auth.store';
 
 const api = axios.create({
   baseURL: 'http://localhost:3000/api',
 });
 
-api.interceptors.request.use(async (config) => {
-  try {
-    const session = await fetchAuthSession();
-    const token = session.tokens?.accessToken?.toString();
+api.interceptors.request.use((config) => {
+  const token =
+    useAuthStore.getState().token;
 
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-  } catch (err) {
-    console.log('No auth session');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
 
   return config;

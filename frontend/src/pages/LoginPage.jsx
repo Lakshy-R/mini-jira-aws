@@ -1,50 +1,180 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { confirmSignIn, fetchAuthSession, getCurrentUser } from 'aws-amplify/auth';
 import { login } from '../services/auth.service';
 import { useAuthStore } from '../store/auth.store';
 import { useNavigate } from 'react-router-dom';
 
 export default function LoginPage() {
+  const navigate = useNavigate();
+  const setAuth = useAuthStore((state) => state.setAuth);
+  const token = useAuthStore((state) => state.token);
+
+  // If already logged in, go straight to the board
+  useEffect(() => {
+    if (token) navigate('/dashboard', { replace: true });
+  }, [token, navigate]);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const setAuth = useAuthStore((s) => s.setAuth);
-  const navigate = useNavigate();
+  // New password step state
+  const [needsNewPassword, setNeedsNewPassword] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
+  // Step 1: Initial login
+  const handleLogin = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
     try {
-      const res = await login(email, password);
+      const { token, user, isSignedIn, nextStep } = await login(email, password);
 
-      setAuth(res.user, res.token);
+      if (nextStep?.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
+        // Show the new password form
+        setNeedsNewPassword(true);
+        setLoading(false);
+        return;
+      }
 
-      navigate('/');
+      if (!isSignedIn || !token) {
+        throw new Error(nextStep?.signInStep || 'Sign-in incomplete');
+      }
+
+      setAuth(user, token);
+      navigate('/dashboard');
     } catch (err) {
-      alert('Login failed');
-      console.error(err);
+      console.error('Login error:', err);
+      setError(err.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 2: Submit new password
+  const handleNewPassword = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (newPassword !== confirmNewPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { isSignedIn } = await confirmSignIn({
+        challengeResponse: newPassword,
+      });
+
+      if (isSignedIn) {
+        const user = await getCurrentUser();
+        const session = await fetchAuthSession();
+        const token = session.tokens?.accessToken?.toString();
+
+        setAuth(user, token);
+        navigate('/dashboard');
+      } else {
+        throw new Error('Could not complete sign-in after password change');
+      }
+    } catch (err) {
+      console.error('New password error:', err);
+      setError(err.message || 'Failed to set new password');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div style={{ padding: 40 }}>
-      <h2>Login (Cognito)</h2>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      {!needsNewPassword ? (
+        // ── Step 1: Login form ──
+        <form
+          onSubmit={handleLogin}
+          className="bg-white p-8 rounded-xl shadow w-[400px] space-y-4"
+        >
+          <h1 className="text-2xl font-bold">Mini Jira Login</h1>
 
-      <input
-        placeholder="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-      />
+          {error && (
+            <p className="text-red-500 text-sm">{error}</p>
+          )}
 
-      <br />
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="border p-2 rounded w-full"
+            required
+          />
 
-      <input
-        placeholder="password"
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-      />
+          <input
+            type="password"
+            placeholder="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="border p-2 rounded w-full"
+            required
+          />
 
-      <br />
+          <button
+            type="submit"
+            disabled={loading}
+            className="bg-black text-white px-4 py-2 rounded w-full disabled:opacity-50"
+          >
+            {loading ? 'Signing in…' : 'Login'}
+          </button>
+        </form>
+      ) : (
+        // ── Step 2: Set new password form ──
+        <form
+          onSubmit={handleNewPassword}
+          className="bg-white p-8 rounded-xl shadow w-[400px] space-y-4"
+        >
+          <h1 className="text-2xl font-bold">Set New Password</h1>
+          <p className="text-sm text-gray-500">
+            Your account requires a new password before you can continue.
+          </p>
 
-      <button onClick={handleLogin}>Login</button>
+          {error && (
+            <p className="text-red-500 text-sm">{error}</p>
+          )}
+
+          <input
+            type="password"
+            placeholder="New password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            className="border p-2 rounded w-full"
+            required
+          />
+
+          <input
+            type="password"
+            placeholder="Confirm new password"
+            value={confirmNewPassword}
+            onChange={(e) => setConfirmNewPassword(e.target.value)}
+            className="border p-2 rounded w-full"
+            required
+          />
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="bg-black text-white px-4 py-2 rounded w-full disabled:opacity-50"
+          >
+            {loading ? 'Saving…' : 'Set Password & Login'}
+          </button>
+        </form>
+      )}
     </div>
   );
 }

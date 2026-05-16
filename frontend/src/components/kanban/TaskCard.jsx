@@ -1,6 +1,25 @@
+import { useDraggable } from '@dnd-kit/core';
+
 export default function TaskCard({ task }) {
+    const { attributes, listeners, setNodeRef, transform } =
+        useDraggable({
+            id: task.taskId,
+        });
+
+    const style = transform
+        ? {
+            transform: `translate(${transform.x}px, ${transform.y}px)`,
+        }
+        : undefined;
+
     return (
-        <div className="bg-white rounded-xl shadow p-4 border">
+        <div
+            ref={setNodeRef}
+            style={style}
+            {...listeners}
+            {...attributes}
+            className="bg-white rounded-xl shadow p-4 border cursor-grab"
+        >
             <div className="flex items-center justify-between">
                 <h3 className="font-bold text-lg">
                     {task.title}

@@ -35,7 +35,7 @@ export default function DashboardPage() {
 
             <TaskForm onTaskCreated={loadTasks} />
 
-            <KanbanBoard tasks={tasks} />
+            <KanbanBoard tasks={tasks} reloadTasks={loadTasks} />
         </div>
     );
 }

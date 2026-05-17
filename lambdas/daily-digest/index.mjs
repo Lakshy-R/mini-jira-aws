@@ -1,21 +1,19 @@
 import { DynamoDBClient } from '@aws-sdk/client-dynamodb';
 import { DynamoDBDocumentClient, ScanCommand } from '@aws-sdk/lib-dynamodb';
 import { SNSClient, PublishCommand } from '@aws-sdk/client-sns';
+import { CloudWatchClient, PutMetricDataCommand } from '@aws-sdk/client-cloudwatch';
 
 const ddbClient = new DynamoDBClient({ region: process.env.AWS_REGION || 'eu-north-1' });
 const docClient = DynamoDBDocumentClient.from(ddbClient);
 const snsClient = new SNSClient({ region: process.env.AWS_REGION || 'eu-north-1' });
+const cwClient = new CloudWatchClient({ region: process.env.AWS_REGION || 'eu-north-1' });
 
 export const handler = async (event) => {
   console.log('Daily digest triggered by EventBridge:', JSON.stringify(event));
 
   try {
-    // We only care about tasks that are NOT DONE
-    // A more complex query could filter by today's date exactly, but let's scan all active ones
-    // or just scan and filter in memory to keep it simple for the assignment.
     const todayStr = new Date().toISOString().split('T')[0];
     
-    // In DynamoDB we'll scan for tasks
     const { Items } = await docClient.send(new ScanCommand({
       TableName: process.env.DYNAMODB_TASKS_TABLE || 'Tasks'
     }));
@@ -25,7 +23,6 @@ export const handler = async (event) => {
       return;
     }
 
-    // Filter tasks due today (or overdue) and not DONE, and has assignee
     const dueTasks = Items.filter(task => {
       if (task.status === 'DONE') return false;
       if (!task.assigneeId) return false;
@@ -37,7 +34,25 @@ export const handler = async (event) => {
 
     console.log(`Found ${dueTasks.length} tasks due today or overdue.`);
 
-    // Group by assignee
+    // Publish OverdueTasks metric to CloudWatch
+    if (dueTasks.length > 0) {
+      try {
+        await cwClient.send(new PutMetricDataCommand({
+          Namespace: 'MiniJira/Tasks',
+          MetricData: [{
+            MetricName: 'OverdueTasks',
+            Dimensions: [{ Name: 'Environment', Value: process.env.ENV || 'production' }],
+            Value: dueTasks.length,
+            Unit: 'Count',
+            Timestamp: new Date(),
+          }]
+        }));
+        console.log(`Successfully published OverdueTasks metric: ${dueTasks.length}`);
+      } catch (cwErr) {
+        console.error('Failed to publish OverdueTasks metric:', cwErr);
+      }
+    }
+
     const tasksByAssignee = dueTasks.reduce((acc, task) => {
       if (!acc[task.assigneeId]) {
         acc[task.assigneeId] = [];
@@ -46,15 +61,6 @@ export const handler = async (event) => {
       return acc;
     }, {});
 
-    // Send an SNS email to each assignee
-    // Note: SNS Topic fan-out usually broadcasts the same message to all subscribers.
-    // The assignment says: "sends each assignee a digest email via SNS." 
-    // To send individual emails via SNS, we'd need to publish to an assignee-specific topic,
-    // OR we just broadcast a generic digest. But let's publish individual messages to the global topic, 
-    // or direct emails if we used SES. Since the requirement forces SNS, we will publish 
-    // individual messages to the global topic and assume the subscriber handles filtering,
-    // OR we create a generic payload. Let's just publish one SNS message per assignee.
-    
     const topicArn = process.env.SNS_TOPIC_ARN;
     if (!topicArn) {
       console.warn('SNS_TOPIC_ARN not set. Skipping sending digests.');

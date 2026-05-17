@@ -2,6 +2,7 @@ import { tasksRepository } from './tasks.repository.js';
 import { v4 as uuid } from 'uuid';
 import { deleteFromS3, getSignedImageUrl } from '../../lib/s3.js';
 import { publishTaskAssignment } from '../../lib/sns.js';
+import { recordTaskCreated, recordTaskClosed } from '../../lib/cloudwatch.js';
 
 export const tasksService = {
     async createTask(data, user) {
@@ -25,6 +26,8 @@ export const tasksService = {
         if (task.assigneeId) {
             await publishTaskAssignment(task);
         }
+
+        recordTaskCreated(task.teamId).catch(err => console.error(err));
 
         return task;
     },
@@ -63,14 +66,18 @@ export const tasksService = {
         return task;
     },
 
-    async updateTaskStatus(
-        taskId,
-        status
-    ) {
-        return await tasksRepository.updateStatus(
-            taskId,
-            status
-        );
+    async updateTaskStatus(taskId, status) {
+        const task = await tasksRepository.getById(taskId);
+        if (!task) return null;
+
+        const updated = await tasksRepository.updateStatus(taskId, status);
+
+        if (status === 'DONE' && task.createdAt) {
+            const timeToCloseMs = Date.now() - new Date(task.createdAt).getTime();
+            recordTaskClosed(task.teamId, timeToCloseMs).catch(err => console.error(err));
+        }
+
+        return updated;
     },
 
     async updateTaskImage(taskId, newImageUrl, user) {

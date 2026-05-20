@@ -1,4 +1,5 @@
 import Navbar from './Navbar';
+import Toaster from '../ui/Toaster';
 
 export default function AppLayout({ children }) {
   return (
@@ -7,6 +8,7 @@ export default function AppLayout({ children }) {
       <main className="max-w-7xl mx-auto px-6 py-8">
         {children}
       </main>
+      <Toaster />
     </div>
   );
 }

@@ -1,51 +1,44 @@
 import express from 'express';
-
 import { tasksController } from './tasks.controller.js';
-
 import { authMiddleware } from '../../middleware/auth.middleware.js';
-
 import { requireRole } from '../../middleware/rbac.middleware.js';
+import { validate } from '../../middleware/validate.middleware.js';
 import { upload } from '../../lib/s3.js';
+import { CreateTaskSchema, UpdateStatusSchema, UpdateTaskSchema } from './tasks.schema.js';
 
 const router = express.Router();
 
-// Protect all routes
 router.use(authMiddleware);
 
-// GET all tasks
 router.get('/', tasksController.getAll);
-
-// GET single task
 router.get('/:id', tasksController.getOne);
-
-// GET presigned image URL for a task's private S3 image
 router.get('/:id/image-url', tasksController.getImageUrl);
 
-// CREATE task
-router.post(
-    '/',
-    requireRole('manager'),
-    tasksController.create
+router.post('/',
+  requireRole('manager'),
+  validate(CreateTaskSchema),
+  tasksController.create
 );
 
-// UPDATE task status
-router.patch(
-    '/:id/status',
-    tasksController.updateStatus
+router.patch('/:id/status',
+  validate(UpdateStatusSchema),
+  tasksController.updateStatus
 );
 
-// UPDATE task image
-router.patch(
-    '/:id/image',
-    upload.single('image'),
-    tasksController.updateImage
+router.patch('/:id/image',
+  upload.single('image'),
+  tasksController.updateImage
 );
 
-// DELETE task
-router.delete(
-    '/:id',
-    requireRole('manager'),
-    tasksController.delete
+router.patch('/:id',
+  requireRole('manager'),
+  validate(UpdateTaskSchema),
+  tasksController.update
+);
+
+router.delete('/:id',
+  requireRole('manager'),
+  tasksController.delete
 );
 
 export default router;

@@ -7,17 +7,22 @@ const router = express.Router();
 
 router.use(authMiddleware);
 
-// GET all projects
 router.get('/', projectsController.getAll);
-
-// GET project by id
 router.get('/:id', projectsController.getOne);
 
-// CREATE project (manager only)
-router.post(
-    '/',
-    requireRole('manager'),
-    projectsController.create
+router.post('/',
+  requireRole('manager'),
+  projectsController.create
+);
+
+router.patch('/:id',
+  requireRole('manager'),
+  projectsController.update
+);
+
+router.delete('/:id',
+  requireRole('manager'),
+  projectsController.delete
 );
 
 export default router;

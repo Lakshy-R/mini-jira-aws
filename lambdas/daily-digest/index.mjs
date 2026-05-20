@@ -8,83 +8,102 @@ const docClient = DynamoDBDocumentClient.from(ddbClient);
 const snsClient = new SNSClient({ region: process.env.AWS_REGION || 'eu-north-1' });
 const cwClient = new CloudWatchClient({ region: process.env.AWS_REGION || 'eu-north-1' });
 
+/**
+ * Daily digest Lambda.
+ * Triggered by EventBridge at 9:00 AM every day.
+ *
+ * IMPORTANT: Uses SNS_DIGEST_TOPIC_ARN — a SEPARATE topic from TaskAssignmentsTopic.
+ * This prevents digest messages from entering the assignment-worker SQS pipeline.
+ * Create a new SNS topic (DailyDigestTopic) and subscribe assignee emails directly to it.
+ */
 export const handler = async (event) => {
-  console.log('Daily digest triggered by EventBridge:', JSON.stringify(event));
+  console.log('Daily digest triggered:', JSON.stringify(event));
+
+  // Prefer dedicated digest topic; warn if falling back to the assignment topic
+  const topicArn = process.env.SNS_DIGEST_TOPIC_ARN;
+  if (!topicArn) {
+    console.error('SNS_DIGEST_TOPIC_ARN is not set. Aborting digest to prevent polluting the assignment pipeline.');
+    return { statusCode: 400, body: 'SNS_DIGEST_TOPIC_ARN not configured' };
+  }
 
   try {
     const todayStr = new Date().toISOString().split('T')[0];
-    
-    const { Items } = await docClient.send(new ScanCommand({
-      TableName: process.env.DYNAMODB_TASKS_TABLE || 'Tasks'
-    }));
+
+    const { Items } = await docClient.send(
+      new ScanCommand({ TableName: process.env.DYNAMODB_TASKS_TABLE || 'Tasks' })
+    );
 
     if (!Items || Items.length === 0) {
       console.log('No tasks found.');
-      return;
+      return { statusCode: 200, body: 'No tasks' };
     }
 
-    const dueTasks = Items.filter(task => {
+    const dueTasks = Items.filter((task) => {
       if (task.status === 'DONE') return false;
-      if (!task.assigneeId) return false;
-      if (!task.deadline) return false;
-      
+      if (!task.assigneeId || !task.deadline) return false;
       const deadlineDate = new Date(task.deadline).toISOString().split('T')[0];
       return deadlineDate <= todayStr;
     });
 
     console.log(`Found ${dueTasks.length} tasks due today or overdue.`);
 
-    // Publish OverdueTasks metric to CloudWatch
+    // Publish OverdueTasks metric
     if (dueTasks.length > 0) {
-      try {
-        await cwClient.send(new PutMetricDataCommand({
+      await cwClient.send(
+        new PutMetricDataCommand({
           Namespace: 'MiniJira/Tasks',
-          MetricData: [{
-            MetricName: 'OverdueTasks',
-            Dimensions: [{ Name: 'Environment', Value: process.env.ENV || 'production' }],
-            Value: dueTasks.length,
-            Unit: 'Count',
-            Timestamp: new Date(),
-          }]
-        }));
-        console.log(`Successfully published OverdueTasks metric: ${dueTasks.length}`);
-      } catch (cwErr) {
-        console.error('Failed to publish OverdueTasks metric:', cwErr);
-      }
+          MetricData: [
+            {
+              MetricName: 'OverdueTasks',
+              Dimensions: [{ Name: 'Environment', Value: process.env.ENV || 'production' }],
+              Value: dueTasks.length,
+              Unit: 'Count',
+              Timestamp: new Date(),
+            },
+          ],
+        })
+      ).catch((err) => console.error('Failed to publish OverdueTasks metric:', err));
     }
 
-    const tasksByAssignee = dueTasks.reduce((acc, task) => {
-      if (!acc[task.assigneeId]) {
-        acc[task.assigneeId] = [];
-      }
+    // Group tasks by assignee
+    const byAssignee = dueTasks.reduce((acc, task) => {
+      if (!acc[task.assigneeId]) acc[task.assigneeId] = [];
       acc[task.assigneeId].push(task);
       return acc;
     }, {});
 
-    const topicArn = process.env.SNS_TOPIC_ARN;
-    if (!topicArn) {
-      console.warn('SNS_TOPIC_ARN not set. Skipping sending digests.');
-      return;
-    }
+    // Send one digest email per assignee
+    const sends = Object.entries(byAssignee).map(async ([assigneeId, tasks]) => {
+      const taskLines = tasks
+        .map((t) => `  • ${t.title} — Status: ${t.status}, Due: ${new Date(t.deadline).toLocaleDateString()}`)
+        .join('\n');
 
-    for (const [assigneeId, tasks] of Object.entries(tasksByAssignee)) {
-      const taskListStr = tasks.map(t => `- ${t.title} (Status: ${t.status}, Deadline: ${new Date(t.deadline).toLocaleDateString()})`).join('\n');
-      
-      const message = `Hello Assignee ${assigneeId},\n\nYou have ${tasks.length} task(s) due today or overdue:\n\n${taskListStr}\n\nPlease update their status on the Mini-Jira dashboard.\n\nBest,\nMini-Jira System`;
-      
-      await snsClient.send(new PublishCommand({
-        TopicArn: topicArn,
-        Subject: `Mini-Jira Daily Digest - ${tasks.length} tasks due`,
-        Message: message
-      }));
-      console.log(`Sent digest to assignee: ${assigneeId}`);
-    }
+      const message =
+        `Hello,\n\n` +
+        `You have ${tasks.length} task(s) that are due today or overdue:\n\n` +
+        `${taskLines}\n\n` +
+        `Please update their status on Mini-Jira.\n\n` +
+        `Best,\nMini-Jira System`;
 
-    console.log('Daily digest processing complete.');
-    return { statusCode: 200, body: 'Success' };
+      await snsClient.send(
+        new PublishCommand({
+          TopicArn: topicArn,
+          Subject: `[Mini-Jira] Daily Digest — ${tasks.length} task(s) need attention`,
+          Message: message,
+          MessageAttributes: {
+            assigneeId: { DataType: 'String', StringValue: assigneeId },
+          },
+        })
+      );
+      console.log(`Sent digest for assignee: ${assigneeId} (${tasks.length} tasks)`);
+    });
 
+    await Promise.allSettled(sends);
+
+    console.log('Daily digest complete.');
+    return { statusCode: 200, body: `Processed ${dueTasks.length} overdue tasks` };
   } catch (err) {
-    console.error('Error executing daily digest:', err);
+    console.error('Daily digest failed:', err);
     throw err;
   }
 };

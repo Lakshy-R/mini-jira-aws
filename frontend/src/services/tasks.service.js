@@ -1,8 +1,11 @@
 import api from './api';
 
 export const tasksService = {
-  async getTasks() {
-    const res = await api.get('/tasks');
+  async getTasks(options = {}) {
+    const params = {};
+    if (options.lastKey) params.lastKey = encodeURIComponent(JSON.stringify(options.lastKey));
+    if (options.limit) params.limit = options.limit;
+    const res = await api.get('/tasks', { params });
     return res.data;
   },
 
@@ -12,9 +15,12 @@ export const tasksService = {
   },
 
   async updateStatus(taskId, status) {
-    const res = await api.patch(`/tasks/${taskId}/status`, {
-      status,
-    });
+    const res = await api.patch(`/tasks/${taskId}/status`, { status });
+    return res.data;
+  },
+
+  async updateTask(taskId, fields) {
+    const res = await api.patch(`/tasks/${taskId}`, fields);
     return res.data;
   },
 
@@ -23,7 +29,6 @@ export const tasksService = {
     return res.data;
   },
 
-  // --- Comments ---
   async getComments(taskId) {
     const res = await api.get(`/tasks/${taskId}/comments`);
     return res.data;
@@ -41,22 +46,17 @@ export const tasksService = {
 };
 
 export const createTask = async (taskData, imageFile) => {
-  // 1. Upload image if exists
   let imageUrl = null;
+
   if (imageFile) {
     const formData = new FormData();
     formData.append('image', imageFile);
-    try {
-      const uploadRes = await api.post('/upload/task-image', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      imageUrl = uploadRes.data.imageUrl;
-    } catch (uploadErr) {
-      console.error("Image upload failed:", uploadErr);
-    }
+    const uploadRes = await api.post('/upload/task-image', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    imageUrl = uploadRes.data.imageUrl;
   }
 
-  // 2. Create task
   const res = await api.post('/tasks', { ...taskData, imageUrl });
   return res.data;
 };

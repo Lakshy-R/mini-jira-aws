@@ -1,5 +1,4 @@
 import { ddb } from '../../lib/dynamodb.js';
-
 import {
     PutCommand,
     ScanCommand,
@@ -8,18 +7,18 @@ import {
     DeleteCommand,
 } from '@aws-sdk/lib-dynamodb';
 
-const TABLE = 'Projects';
+const TABLE = 'Teams';
 
-export const projectsRepository = {
-    async create(project) {
+export const teamsRepository = {
+    async create(team) {
         await ddb.send(
             new PutCommand({
                 TableName: TABLE,
-                Item: project,
+                Item: team,
             })
         );
 
-        return project;
+        return team;
     },
 
     async getAll() {
@@ -28,31 +27,28 @@ export const projectsRepository = {
                 TableName: TABLE,
             })
         );
-
         return res.Items;
     },
 
-    async getById(projectId) {
+    async getById(teamId) {
         const res = await ddb.send(
             new GetCommand({
                 TableName: TABLE,
-                Key: { projectId },
+                Key: { teamId },
             })
         );
-
         return res.Item;
     },
 
-    async update(projectId, data) {
+    async update(teamId, data) {
         const allowed = {
             name: data?.name,
             description: data?.description,
-            teamId: data?.teamId,
         };
 
         const updates = Object.entries(allowed).filter(([, value]) => value !== undefined);
         if (updates.length === 0) {
-            return await this.getById(projectId);
+            return await this.getById(teamId);
         }
 
         const setExpressions = [];
@@ -72,7 +68,7 @@ export const projectsRepository = {
         const result = await ddb.send(
             new UpdateCommand({
                 TableName: TABLE,
-                Key: { projectId },
+                Key: { teamId },
                 UpdateExpression: `SET ${setExpressions.join(', ')}`,
                 ExpressionAttributeNames: expressionAttributeNames,
                 ExpressionAttributeValues: expressionAttributeValues,
@@ -83,11 +79,11 @@ export const projectsRepository = {
         return result.Attributes;
     },
 
-    async delete(projectId) {
+    async delete(teamId) {
         await ddb.send(
             new DeleteCommand({
                 TableName: TABLE,
-                Key: { projectId },
+                Key: { teamId },
             })
         );
         return true;

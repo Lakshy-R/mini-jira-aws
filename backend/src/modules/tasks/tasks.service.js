@@ -1,8 +1,49 @@
 import { tasksRepository } from './tasks.repository.js';
 import { v4 as uuid } from 'uuid';
+import { PutCommand } from '@aws-sdk/lib-dynamodb';
 import { deleteFromS3, getSignedImageUrl } from '../../lib/s3.js';
 import { publishTaskAssignment } from '../../lib/sns.js';
 import { recordTaskCreated, recordTaskClosed } from '../../lib/cloudwatch.js';
+import { ddb } from '../../lib/dynamodb.js';
+
+const getUserId = (user) => user?.sub || user?.userId;
+const ACTIVITY_TABLE = process.env.DYNAMODB_ACTIVITY_TABLE || 'ActivityLogs';
+
+const assertTaskAccess = async (taskId, user) => {
+    const task = await tasksRepository.getById(taskId);
+    if (!task) throw new Error('NOT_FOUND');
+
+    if (user?.role !== 'manager' && task.teamId !== user?.teamId) {
+        throw new Error('FORBIDDEN');
+    }
+
+    return task;
+};
+
+const recordStatusChange = async (task, status, user) => {
+    if (!task) return;
+
+    const userId = getUserId(user);
+    const now = new Date().toISOString();
+
+    await ddb.send(
+        new PutCommand({
+            TableName: ACTIVITY_TABLE,
+            Item: {
+                logId: uuid(),
+                taskId: task.taskId,
+                teamId: task.teamId,
+                assigneeId: task.assigneeId,
+                managerId: task.managerId,
+                action: 'STATUS_CHANGE',
+                fromStatus: task.status,
+                toStatus: status,
+                changedBy: userId,
+                timestamp: now,
+            },
+        })
+    );
+};
 
 export const tasksService = {
     async createTask(data, user) {
@@ -12,6 +53,7 @@ export const tasksService = {
             description: data.description,
             status: 'TODO',
             priority: data.priority,
+            deadline: data.deadline || null,
             teamId: data.teamId,
             assigneeId: data.assigneeId,
             projectId: data.projectId,
@@ -54,8 +96,8 @@ export const tasksService = {
         }));
     },
 
-    async getTaskById(taskId) {
-        const task = await tasksRepository.getById(taskId);
+    async getTaskById(taskId, user) {
+        const task = await assertTaskAccess(taskId, user);
         if (task) {
             const urlOrKey = task.thumbnailUrl || task.imageUrl;
             if (urlOrKey) {
@@ -66,11 +108,35 @@ export const tasksService = {
         return task;
     },
 
-    async updateTaskStatus(taskId, status) {
-        const task = await tasksRepository.getById(taskId);
-        if (!task) return null;
+    async updateTask(taskId, data, user) {
+        const task = await assertTaskAccess(taskId, user);
+
+        const updated = await tasksRepository.updateDetails(taskId, data);
+
+        if (data?.assigneeId && data.assigneeId !== task.assigneeId) {
+            await publishTaskAssignment({
+                ...task,
+                ...updated,
+                assigneeId: data.assigneeId,
+            });
+        }
+
+        return updated;
+    },
+
+    async updateTaskStatus(taskId, status, user) {
+        const task = await assertTaskAccess(taskId, user);
+
+        const userId = getUserId(user);
+        if (user?.role !== 'manager' && task.assigneeId !== userId) {
+            throw new Error('FORBIDDEN');
+        }
 
         const updated = await tasksRepository.updateStatus(taskId, status);
+
+        if (task.status !== status) {
+            recordStatusChange(task, status, user).catch(err => console.error(err));
+        }
 
         if (status === 'DONE' && task.createdAt) {
             const timeToCloseMs = Date.now() - new Date(task.createdAt).getTime();
@@ -81,18 +147,28 @@ export const tasksService = {
     },
 
     async updateTaskImage(taskId, newImageUrl, user) {
-        const task = await this.getTaskById(taskId);
-        if (!task) return null;
+        const task = await assertTaskAccess(taskId, user);
+
+        const userId = getUserId(user);
+        if (user?.role !== 'manager' && task.assigneeId !== userId) {
+            throw new Error('FORBIDDEN');
+        }
 
         return await tasksRepository.updateImage(taskId, newImageUrl);
     },
 
-    async deleteTask(taskId) {
-        const task = await tasksRepository.getById(taskId);
-        if (!task) return false;
+    async deleteTask(taskId, user) {
+        const task = await assertTaskAccess(taskId, user);
 
-        if (task.imageUrl) {
-            await deleteFromS3(task.imageUrl);
+        const imageTargets = new Set();
+        if (task.imageUrl) imageTargets.add(task.imageUrl);
+        if (task.thumbnailUrl) imageTargets.add(task.thumbnailUrl);
+        if (Array.isArray(task.imageVersions)) {
+            task.imageVersions.forEach((url) => imageTargets.add(url));
+        }
+
+        for (const target of imageTargets) {
+            await deleteFromS3(target);
         }
 
         return await tasksRepository.delete(taskId);

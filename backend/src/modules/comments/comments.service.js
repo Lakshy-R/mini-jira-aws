@@ -33,6 +33,22 @@ export const commentsService = {
     return commentsRepository.getByTaskId(taskId);
   },
 
+  async updateComment(commentId, taskId, content, user) {
+    const task = await assertTaskAccess(taskId, user);
+    if (!task) throw new Error('NOT_FOUND');
+
+    const userId = user.sub || user.userId;
+
+    const comments = await commentsRepository.getByTaskId(taskId);
+    const comment = comments.find((c) => c.commentId === commentId);
+    if (!comment) throw new Error('NOT_FOUND');
+    if (user.role !== 'manager' && comment.authorId !== userId) {
+      throw new Error('FORBIDDEN');
+    }
+
+    return commentsRepository.update(commentId, content.trim());
+  },
+
   async deleteComment(commentId, taskId, user) {
     const task = await assertTaskAccess(taskId, user);
     if (!task) throw new Error('NOT_FOUND');

@@ -1,5 +1,4 @@
 import { ddb } from '../../lib/dynamodb.js';
-
 import {
     PutCommand,
     ScanCommand,
@@ -8,18 +7,18 @@ import {
     DeleteCommand,
 } from '@aws-sdk/lib-dynamodb';
 
-const TABLE = 'Projects';
+const TABLE = 'Users';
 
-export const projectsRepository = {
-    async create(project) {
+export const usersRepository = {
+    async create(user) {
         await ddb.send(
             new PutCommand({
                 TableName: TABLE,
-                Item: project,
+                Item: user,
             })
         );
 
-        return project;
+        return user;
     },
 
     async getAll() {
@@ -28,31 +27,30 @@ export const projectsRepository = {
                 TableName: TABLE,
             })
         );
-
         return res.Items;
     },
 
-    async getById(projectId) {
+    async getById(userId) {
         const res = await ddb.send(
             new GetCommand({
                 TableName: TABLE,
-                Key: { projectId },
+                Key: { userId },
             })
         );
-
         return res.Item;
     },
 
-    async update(projectId, data) {
+    async update(userId, data) {
         const allowed = {
             name: data?.name,
-            description: data?.description,
+            email: data?.email,
+            role: data?.role,
             teamId: data?.teamId,
         };
 
         const updates = Object.entries(allowed).filter(([, value]) => value !== undefined);
         if (updates.length === 0) {
-            return await this.getById(projectId);
+            return await this.getById(userId);
         }
 
         const setExpressions = [];
@@ -72,7 +70,7 @@ export const projectsRepository = {
         const result = await ddb.send(
             new UpdateCommand({
                 TableName: TABLE,
-                Key: { projectId },
+                Key: { userId },
                 UpdateExpression: `SET ${setExpressions.join(', ')}`,
                 ExpressionAttributeNames: expressionAttributeNames,
                 ExpressionAttributeValues: expressionAttributeValues,
@@ -83,11 +81,11 @@ export const projectsRepository = {
         return result.Attributes;
     },
 
-    async delete(projectId) {
+    async delete(userId) {
         await ddb.send(
             new DeleteCommand({
                 TableName: TABLE,
-                Key: { projectId },
+                Key: { userId },
             })
         );
         return true;

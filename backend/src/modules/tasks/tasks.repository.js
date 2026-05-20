@@ -98,8 +98,8 @@ export const tasksRepository = {
         const versions = Array.isArray(existing.imageVersions)
             ? existing.imageVersions
             : existing.imageUrl
-            ? [existing.imageUrl]
-            : [];
+                ? [existing.imageUrl]
+                : [];
 
         if (existing.imageUrl && existing.imageUrl !== newImageUrl) {
             versions.push(existing.imageUrl);
@@ -119,6 +119,50 @@ export const tasksRepository = {
                 ReturnValues: 'ALL_NEW',
             })
         );
+        return result.Attributes;
+    },
+
+    async updateDetails(taskId, data) {
+        const allowed = {
+            title: data?.title,
+            description: data?.description,
+            priority: data?.priority,
+            deadline: data?.deadline,
+            assigneeId: data?.assigneeId,
+            teamId: data?.teamId,
+            projectId: data?.projectId,
+        };
+
+        const updates = Object.entries(allowed).filter(([, value]) => value !== undefined);
+        if (updates.length === 0) {
+            return await this.getById(taskId);
+        }
+
+        const setExpressions = [];
+        const expressionAttributeNames = {};
+        const expressionAttributeValues = { ':now': new Date().toISOString() };
+
+        updates.forEach(([key, value], index) => {
+            const nameKey = `#k${index}`;
+            const valueKey = `:v${index}`;
+            expressionAttributeNames[nameKey] = key;
+            expressionAttributeValues[valueKey] = value;
+            setExpressions.push(`${nameKey} = ${valueKey}`);
+        });
+
+        setExpressions.push('updatedAt = :now');
+
+        const result = await ddb.send(
+            new UpdateCommand({
+                TableName: TABLE,
+                Key: { taskId },
+                UpdateExpression: `SET ${setExpressions.join(', ')}`,
+                ExpressionAttributeNames: expressionAttributeNames,
+                ExpressionAttributeValues: expressionAttributeValues,
+                ReturnValues: 'ALL_NEW',
+            })
+        );
+
         return result.Attributes;
     },
 

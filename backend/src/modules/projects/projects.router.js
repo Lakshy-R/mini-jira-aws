@@ -20,4 +20,18 @@ router.post(
     projectsController.create
 );
 
+// UPDATE project (manager only)
+router.patch(
+    '/:id',
+    requireRole('manager'),
+    projectsController.update
+);
+
+// DELETE project (manager only)
+router.delete(
+    '/:id',
+    requireRole('manager'),
+    projectsController.delete
+);
+
 export default router;

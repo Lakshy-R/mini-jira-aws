@@ -1,6 +1,16 @@
 import { useState, useEffect, useRef } from "react";
 import { tasksService } from "../../services/tasks.service";
 import { useAuthStore } from "../../store/auth.store";
+import {
+  Avatar,
+  Box,
+  Button,
+  Divider,
+  Skeleton,
+  Stack,
+  TextField,
+  Typography,
+} from "@mui/material";
 
 /**
  * CommentThread
@@ -70,28 +80,27 @@ export default function CommentThread({ taskId }) {
 
   if (loading) {
     return (
-      <div className="flex flex-col gap-3 animate-pulse">
+      <Stack spacing={2}>
         {[1, 2].map((i) => (
-          <div key={i} className="flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-gray-200 shrink-0" />
-            <div className="flex-1 space-y-2">
-              <div className="h-3 w-24 bg-gray-200 rounded" />
-              <div className="h-3 w-full bg-gray-200 rounded" />
-            </div>
-          </div>
+          <Stack direction="row" spacing={2} key={i} alignItems="center">
+            <Skeleton variant="circular" width={32} height={32} />
+            <Box sx={{ flex: 1 }}>
+              <Skeleton variant="text" width={120} />
+              <Skeleton variant="text" />
+            </Box>
+          </Stack>
         ))}
-      </div>
+      </Stack>
     );
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Comment list */}
-      <div className="flex flex-col gap-4 max-h-80 overflow-y-auto pr-1">
+    <Stack spacing={2}>
+      <Stack spacing={2} sx={{ maxHeight: 320, overflowY: 'auto', pr: 1 }}>
         {comments.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">
+          <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 2 }}>
             No comments yet. Be the first to comment.
-          </p>
+          </Typography>
         ) : (
           comments.map((comment) => (
             <CommentItem
@@ -104,44 +113,47 @@ export default function CommentThread({ taskId }) {
           ))
         )}
         <div ref={bottomRef} />
-      </div>
+      </Stack>
 
-      {/* Divider */}
-      <div className="border-t border-gray-100" />
+      <Divider />
 
-      {/* Input form */}
-      <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-        <div className="flex gap-3">
-          {/* Current user avatar */}
-          <Avatar name={user?.name || user?.email || "You"} size="sm" />
+      <Box component="form" onSubmit={handleSubmit}>
+        <Stack direction="row" spacing={2} alignItems="flex-start">
+          <Avatar sx={{ width: 32, height: 32 }}>
+            {initialsFromName(user?.name || user?.email || "You")}
+          </Avatar>
 
-          <div className="flex-1 flex flex-col gap-2">
-            <textarea
+          <Stack spacing={1} sx={{ flex: 1 }}>
+            <TextField
               value={content}
               onChange={(e) => setContent(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Add a comment… (⌘+Enter to send)"
+              placeholder="Add a comment… (Ctrl+Enter to send)"
+              multiline
               rows={3}
-              className="w-full rounded-lg border border-gray-200 bg-white text-sm text-gray-900 placeholder-gray-400 p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+              size="small"
             />
 
             {error && (
-              <p className="text-xs text-red-500">{error}</p>
+              <Typography variant="caption" color="error">
+                {error}
+              </Typography>
             )}
 
-            <div className="flex justify-end">
-              <button
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button
                 type="submit"
+                variant="contained"
+                size="small"
                 disabled={posting || !content.trim()}
-                className="bg-black text-white px-4 py-2 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {posting ? "Posting…" : "Comment"}
-              </button>
-            </div>
-          </div>
-        </div>
-      </form>
-    </div>
+              </Button>
+            </Box>
+          </Stack>
+        </Stack>
+      </Box>
+    </Stack>
   );
 }
 
@@ -150,86 +162,56 @@ function CommentItem({ comment, currentUserId, isManager, onDelete }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
-    <div className="flex gap-3 group">
-      <Avatar name={comment.authorName} size="sm" />
+    <Stack direction="row" spacing={2} alignItems="flex-start">
+      <Avatar sx={{ width: 32, height: 32 }}>
+        {initialsFromName(comment.authorName)}
+      </Avatar>
 
-      <div className="flex-1 min-w-0">
-        {/* Header row */}
-        <div className="flex items-baseline justify-between gap-2 mb-1">
-          <span className="text-sm font-medium text-gray-900 truncate">
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Stack direction="row" justifyContent="space-between" spacing={1} alignItems="baseline">
+          <Typography variant="subtitle2" noWrap>
             {comment.authorName}
-          </span>
-          <span className="text-xs text-gray-400 shrink-0">
+          </Typography>
+          <Typography variant="caption" color="text.secondary">
             {formatTime(comment.createdAt)}
-          </span>
-        </div>
+          </Typography>
+        </Stack>
 
-        {/* Content */}
-        <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
+        <Typography variant="body2" color="text.primary" sx={{ whiteSpace: 'pre-wrap' }}>
           {comment.content}
-        </p>
+        </Typography>
 
-        {/* Delete */}
         {canDelete && (
-          <div className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <Box sx={{ mt: 0.5 }}>
             {confirmDelete ? (
-              <span className="text-xs text-gray-500">
-                Delete?{" "}
-                <button
-                  onClick={() => onDelete(comment.commentId)}
-                  className="text-red-500 hover:text-red-600 font-medium"
-                >
+              <Typography variant="caption" color="text.secondary">
+                Delete?{' '}
+                <Button size="small" color="error" onClick={() => onDelete(comment.commentId)}>
                   Yes
-                </button>
-                {" · "}
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  className="hover:underline"
-                >
+                </Button>
+                <Button size="small" onClick={() => setConfirmDelete(false)}>
                   Cancel
-                </button>
-              </span>
+                </Button>
+              </Typography>
             ) : (
-              <button
-                onClick={() => setConfirmDelete(true)}
-                className="text-xs text-gray-400 hover:text-red-500 transition-colors"
-              >
+              <Button size="small" color="error" onClick={() => setConfirmDelete(true)}>
                 Delete
-              </button>
+              </Button>
             )}
-          </div>
+          </Box>
         )}
-      </div>
-    </div>
+      </Box>
+    </Stack>
   );
 }
 
-function Avatar({ name = "?", size = "sm" }) {
-  const initials = name
+function initialsFromName(name = "?") {
+  return name
     .split(" ")
     .map((w) => w[0])
     .slice(0, 2)
     .join("")
     .toUpperCase();
-
-  const colors = [
-    "bg-blue-100 text-blue-700",
-    "bg-purple-100 text-purple-700",
-    "bg-teal-100 text-teal-700",
-    "bg-amber-100 text-amber-700",
-  ];
-  const color = colors[name.charCodeAt(0) % colors.length];
-
-  const sizeClass = size === "sm" ? "w-8 h-8 text-xs" : "w-10 h-10 text-sm";
-
-  return (
-    <div
-      className={`${sizeClass} ${color} rounded-full flex items-center justify-center font-medium shrink-0`}
-      aria-hidden="true"
-    >
-      {initials}
-    </div>
-  );
 }
 
 function formatTime(iso) {

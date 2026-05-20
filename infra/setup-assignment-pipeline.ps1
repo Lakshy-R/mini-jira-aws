@@ -33,6 +33,31 @@ aws sqs set-queue-attributes --queue-url $queueUrl --attributes file://sqs-polic
 aws sns subscribe --topic-arn $topicArn --protocol sqs --notification-endpoint $queueArn --region eu-north-1
 Write-Host "Subscribed SQS to SNS"
 
+# Optional: subscribe assignee emails with filter policies
+$assigneePairs = Read-Host "Optional: assignee email subscriptions (assigneeId=email, comma-separated)"
+if ($assigneePairs) {
+  $pairs = $assigneePairs -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ -ne '' }
+  foreach ($pair in $pairs) {
+    $parts = $pair -split '='
+    if ($parts.Count -ne 2) {
+      Write-Host "Skipping invalid pair: $pair"
+      continue
+    }
+    $assigneeId = $parts[0].Trim()
+    $email = $parts[1].Trim()
+    if (-not $assigneeId -or -not $email) {
+      Write-Host "Skipping invalid pair: $pair"
+      continue
+    }
+
+    $filterPolicy = @{ assigneeId = @($assigneeId) } | ConvertTo-Json -Compress
+    $attributes = @{ FilterPolicy = $filterPolicy } | ConvertTo-Json -Compress
+
+    aws sns subscribe --topic-arn $topicArn --protocol email --notification-endpoint $email --attributes $attributes --region eu-north-1 | Out-Null
+    Write-Host "Subscribed email $email for assigneeId=$assigneeId (check inbox to confirm)"
+  }
+}
+
 # Create ActivityLogs Table
 aws dynamodb create-table --table-name ActivityLogs `
   --attribute-definitions AttributeName=logId,AttributeType=S `

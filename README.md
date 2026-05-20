@@ -143,22 +143,86 @@ These buckets store uploaded task images (originals) and Lambda-processed thumbn
 
 ## Step 2 — Create DynamoDB Tables
 
-Create three tables with on-demand billing:
+Create the tables with on-demand billing (or run the helper script below):
+
+```powershell
+# From the project root
+./infra/create-dynamodb-tables.ps1
+```
+
+Manual setup:
 
 ```bash
 # Tasks table
 aws dynamodb create-table \
   --table-name Tasks \
-  --attribute-definitions AttributeName=taskId,AttributeType=S \
+  --attribute-definitions \
+    AttributeName=taskId,AttributeType=S \
+    AttributeName=teamId,AttributeType=S \
+    AttributeName=createdAt,AttributeType=S \
+    AttributeName=assigneeId,AttributeType=S \
   --key-schema AttributeName=taskId,KeyType=HASH \
+  --global-secondary-indexes \
+    "[{
+      \"IndexName\": \"teamId-createdAt-index\",
+      \"KeySchema\": [
+        {\"AttributeName\": \"teamId\", \"KeyType\": \"HASH\"},
+        {\"AttributeName\": \"createdAt\", \"KeyType\": \"RANGE\"}
+      ],
+      \"Projection\": {\"ProjectionType\": \"ALL\"}
+    },
+    {
+      \"IndexName\": \"assigneeId-createdAt-index\",
+      \"KeySchema\": [
+        {\"AttributeName\": \"assigneeId\", \"KeyType\": \"HASH\"},
+        {\"AttributeName\": \"createdAt\", \"KeyType\": \"RANGE\"}
+      ],
+      \"Projection\": {\"ProjectionType\": \"ALL\"}
+    }]" \
   --billing-mode PAY_PER_REQUEST \
   --region eu-north-1
 
 # Comments table
 aws dynamodb create-table \
   --table-name Comments \
-  --attribute-definitions AttributeName=commentId,AttributeType=S \
+  --attribute-definitions \
+    AttributeName=commentId,AttributeType=S \
+    AttributeName=taskId,AttributeType=S \
+    AttributeName=createdAt,AttributeType=S \
   --key-schema AttributeName=commentId,KeyType=HASH \
+  --global-secondary-indexes \
+    "[{
+      \"IndexName\": \"taskId-index\",
+      \"KeySchema\": [
+        {\"AttributeName\": \"taskId\", \"KeyType\": \"HASH\"},
+        {\"AttributeName\": \"createdAt\", \"KeyType\": \"RANGE\"}
+      ],
+      \"Projection\": {\"ProjectionType\": \"ALL\"}
+    }]" \
+  --billing-mode PAY_PER_REQUEST \
+  --region eu-north-1
+
+# Projects table
+aws dynamodb create-table \
+  --table-name Projects \
+  --attribute-definitions AttributeName=projectId,AttributeType=S \
+  --key-schema AttributeName=projectId,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST \
+  --region eu-north-1
+
+# Users table
+aws dynamodb create-table \
+  --table-name Users \
+  --attribute-definitions AttributeName=userId,AttributeType=S \
+  --key-schema AttributeName=userId,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST \
+  --region eu-north-1
+
+# Teams table
+aws dynamodb create-table \
+  --table-name Teams \
+  --attribute-definitions AttributeName=teamId,AttributeType=S \
+  --key-schema AttributeName=teamId,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST \
   --region eu-north-1
 
@@ -264,6 +328,15 @@ You can run the automated script:
 .\infra\setup-assignment-pipeline.ps1
 ```
 
+The script can also subscribe assignee emails with a filter policy. When prompted, enter
+pairs in this format:
+
+```
+sara-frontend=sara@example.com, omar-backend=omar@example.com
+```
+
+Each email must confirm the subscription in their inbox before messages will deliver.
+
 Or do it manually:
 
 ```bash
@@ -324,6 +397,12 @@ Compress-Archive -Path lambdas\daily-digest\* -DestinationPath lambdas\daily-dig
 
 # Run the deployment script (creates role + Lambda + EventBridge rule)
 .\infra\deploy-daily-digest.ps1
+```
+
+Optional: set the namespace for CloudWatch metrics by adding this to the Lambda environment:
+
+```
+CW_NAMESPACE=MiniJira
 ```
 
 Or manually follow the steps in `infra/deploy-daily-digest.ps1`.

@@ -32,6 +32,31 @@ export const commentsController = {
     }
   },
 
+  async updateComment(req, res) {
+    try {
+      const { content } = req.body;
+      if (!content || !content.trim()) {
+        return res.status(400).json({ message: 'Comment content is required.' });
+      }
+
+      const updated = await commentsService.updateComment(
+        req.params.commentId,
+        req.params.taskId,
+        content,
+        req.user
+      );
+
+      return res.status(200).json(updated);
+    } catch (err) {
+      if (err.message === 'NOT_FOUND')
+        return res.status(404).json({ message: 'Comment not found.' });
+      if (err.message === 'FORBIDDEN')
+        return res.status(403).json({ message: 'You can only edit your own comments.' });
+      console.error('[Comments] updateComment error:', err);
+      return res.status(500).json({ message: 'Failed to update comment.' });
+    }
+  },
+
   async deleteComment(req, res) {
     try {
       await commentsService.deleteComment(

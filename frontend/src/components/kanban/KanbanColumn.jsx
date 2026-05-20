@@ -1,4 +1,5 @@
 import { useDroppable } from '@dnd-kit/core';
+import { Paper, Stack, Typography } from '@mui/material';
 import TaskCard from './TaskCard';
 
 export default function KanbanColumn({
@@ -12,15 +13,20 @@ export default function KanbanColumn({
     });
 
     return (
-        <div
+        <Paper
             ref={setNodeRef}
-            className="bg-gray-100 rounded-xl p-4 min-h-[500px]"
+            sx={{
+                p: 2,
+                minHeight: 520,
+                bgcolor: 'grey.100',
+            }}
+            elevation={0}
         >
-            <h2 className="font-bold text-lg mb-4">
+            <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>
                 {title}
-            </h2>
+            </Typography>
 
-            <div className="space-y-4">
+            <Stack spacing={2}>
                 {tasks.map(task => (
                     <TaskCard
                         key={task.taskId}
@@ -28,7 +34,7 @@ export default function KanbanColumn({
                         onClick={() => onTaskClick(task)}
                     />
                 ))}
-            </div>
-        </div>
+            </Stack>
+        </Paper>
     );
 }

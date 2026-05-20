@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 const ddbClient = new DynamoDBClient({});
 const docClient = DynamoDBDocumentClient.from(ddbClient);
 const cwClient = new CloudWatchClient({});
+const CW_NAMESPACE = process.env.CW_NAMESPACE || 'MiniJira';
 
 export const handler = async (event) => {
   console.log('Received event:', JSON.stringify(event, null, 2));
@@ -39,7 +40,7 @@ export const handler = async (event) => {
       // 2. Publish CloudWatch Custom Metric
       const teamId = taskData.teamId || 'UnknownTeam';
       await cwClient.send(new PutMetricDataCommand({
-        Namespace: 'MiniJira/Tasks',
+        Namespace: CW_NAMESPACE,
         MetricData: [
           {
             MetricName: 'TasksAssignedPerTeam',
@@ -56,11 +57,11 @@ export const handler = async (event) => {
         ]
       }));
       console.log(`Successfully published metric TasksAssignedPerTeam for team ${teamId}`);
-      
+
     } catch (err) {
       console.error('Error processing record:', err);
       // If we throw here, SQS will retry the message or move it to DLQ
-      throw err; 
+      throw err;
     }
   }
 

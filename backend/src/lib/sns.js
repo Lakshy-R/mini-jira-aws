@@ -22,6 +22,16 @@ export const publishTaskAssignment = async (taskData) => {
       TopicArn: process.env.SNS_TOPIC_ARN,
       Message: JSON.stringify(message),
       Subject: `New Task Assigned: ${taskData.title}`,
+      MessageAttributes: {
+        assigneeId: {
+          DataType: 'String',
+          StringValue: String(taskData.assigneeId),
+        },
+        teamId: {
+          DataType: 'String',
+          StringValue: String(taskData.teamId),
+        },
+      },
     }));
     console.log(`[SNS] Published task assignment for taskId: ${taskData.taskId}`);
   } catch (err) {

@@ -6,6 +6,8 @@ import tasksRouter from './modules/tasks/tasks.router.js';
 import projectsRouter from './modules/projects/projects.router.js';
 import uploadRouter from './modules/upload/upload.router.js';
 import commentsRouter from './modules/comments/comments.router.js';
+import teamsRouter from './modules/teams/teams.router.js';
+import usersRouter from './modules/users/users.router.js';
 
 import { multerErrorHandler } from './modules/upload/upload.controller.js';
 
@@ -25,6 +27,8 @@ app.use('/api/projects', projectsRouter);
 app.use('/api/tasks', tasksRouter);
 app.use('/api/tasks/:taskId/comments', commentsRouter);
 app.use('/api/upload', uploadRouter);
+app.use('/api/teams', teamsRouter);
+app.use('/api/users', usersRouter);
 
 // ❌ DO NOT apply globally yet (we will refine later)
 // app.use(authMiddleware);

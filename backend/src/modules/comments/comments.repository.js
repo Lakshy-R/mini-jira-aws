@@ -1,4 +1,4 @@
-import { PutCommand, QueryCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
+import { PutCommand, QueryCommand, DeleteCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb } from '../../lib/dynamodb.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -39,5 +39,21 @@ export const commentsRepository = {
 
   async delete(commentId) {
     await ddb.send(new DeleteCommand({ TableName: TABLE, Key: { commentId } }));
+  },
+
+  async update(commentId, content) {
+    const result = await ddb.send(
+      new UpdateCommand({
+        TableName: TABLE,
+        Key: { commentId },
+        UpdateExpression: 'SET content = :content, updatedAt = :now',
+        ExpressionAttributeValues: {
+          ':content': content,
+          ':now': new Date().toISOString(),
+        },
+        ReturnValues: 'ALL_NEW',
+      })
+    );
+    return result.Attributes;
   },
 };

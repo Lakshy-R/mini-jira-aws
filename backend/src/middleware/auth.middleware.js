@@ -13,6 +13,10 @@ try {
 }
 
 export const authMiddleware = async (req, res, next) => {
+  if (!verifier) {
+    return res.status(500).json({ error: 'Auth verifier not configured' });
+  }
+
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {

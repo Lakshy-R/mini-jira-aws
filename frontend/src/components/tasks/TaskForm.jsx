@@ -1,10 +1,19 @@
 import { useState } from 'react';
+import {
+    Button,
+    MenuItem,
+    Paper,
+    Stack,
+    TextField,
+    Typography,
+} from '@mui/material';
 
 export default function TaskForm({ onTaskCreated }) {
     const [form, setForm] = useState({
         title: '',
         description: '',
         priority: 'MEDIUM',
+        deadline: '',
         teamId: '',
         assigneeId: '',
         projectId: '',
@@ -33,6 +42,7 @@ export default function TaskForm({ onTaskCreated }) {
             title: '',
             description: '',
             priority: 'MEDIUM',
+            deadline: '',
             teamId: '',
             assigneeId: '',
             projectId: '',
@@ -41,82 +51,98 @@ export default function TaskForm({ onTaskCreated }) {
     };
 
     return (
-        <form
-            onSubmit={handleSubmit}
-            className="bg-white p-4 rounded-xl shadow mb-6 space-y-4"
-        >
-            <h2 className="text-xl font-bold">
-                Create Task
-            </h2>
+        <Paper component="form" onSubmit={handleSubmit} sx={{ p: 3 }} elevation={2}>
+            <Stack spacing={2}>
+                <Typography variant="h6" fontWeight={700}>
+                    Create Task
+                </Typography>
 
-            <input
-                type="text"
-                name="title"
-                placeholder="Task title"
-                value={form.title}
-                onChange={handleChange}
-                className="border p-2 rounded w-full"
-            />
+                <TextField
+                    name="title"
+                    label="Task title"
+                    value={form.title}
+                    onChange={handleChange}
+                    fullWidth
+                    size="small"
+                />
 
-            <textarea
-                name="description"
-                placeholder="Description"
-                value={form.description}
-                onChange={handleChange}
-                className="border p-2 rounded w-full"
-            />
+                <TextField
+                    name="description"
+                    label="Description"
+                    value={form.description}
+                    onChange={handleChange}
+                    fullWidth
+                    size="small"
+                    multiline
+                    rows={3}
+                />
 
-            <select
-                name="priority"
-                value={form.priority}
-                onChange={handleChange}
-                className="border p-2 rounded w-full"
-            >
-                <option value="LOW">LOW</option>
-                <option value="MEDIUM">MEDIUM</option>
-                <option value="HIGH">HIGH</option>
-            </select>
+                <TextField
+                    name="priority"
+                    label="Priority"
+                    value={form.priority}
+                    onChange={handleChange}
+                    fullWidth
+                    size="small"
+                    select
+                >
+                    <MenuItem value="LOW">LOW</MenuItem>
+                    <MenuItem value="MEDIUM">MEDIUM</MenuItem>
+                    <MenuItem value="HIGH">HIGH</MenuItem>
+                </TextField>
 
-            <input
-                type="text"
-                name="teamId"
-                placeholder="Team ID"
-                value={form.teamId}
-                onChange={handleChange}
-                className="border p-2 rounded w-full"
-            />
+                <TextField
+                    name="deadline"
+                    label="Deadline"
+                    type="date"
+                    value={form.deadline}
+                    onChange={handleChange}
+                    fullWidth
+                    size="small"
+                    InputLabelProps={{ shrink: true }}
+                />
 
-            <input
-                type="text"
-                name="assigneeId"
-                placeholder="Assignee ID"
-                value={form.assigneeId}
-                onChange={handleChange}
-                className="border p-2 rounded w-full"
-            />
+                <TextField
+                    name="teamId"
+                    label="Team ID"
+                    value={form.teamId}
+                    onChange={handleChange}
+                    fullWidth
+                    size="small"
+                />
 
-            <input
-                type="text"
-                name="projectId"
-                placeholder="Project ID"
-                value={form.projectId}
-                onChange={handleChange}
-                className="border p-2 rounded w-full"
-            />
+                <TextField
+                    name="assigneeId"
+                    label="Assignee ID"
+                    value={form.assigneeId}
+                    onChange={handleChange}
+                    fullWidth
+                    size="small"
+                />
 
-            <input
-                type="file"
-                accept="image/*"
-                onChange={handleImageChange}
-                className="border p-2 rounded w-full text-gray-500"
-            />
+                <TextField
+                    name="projectId"
+                    label="Project ID"
+                    value={form.projectId}
+                    onChange={handleChange}
+                    fullWidth
+                    size="small"
+                />
 
-            <button
-                type="submit"
-                className="bg-black text-white px-4 py-2 rounded"
-            >
-                Create Task
-            </button>
-        </form>
+                <Button component="label" variant="outlined">
+                    Upload image
+                    <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        hidden
+                    />
+                </Button>
+
+                <Button type="submit" variant="contained">
+                    Create Task
+                </Button>
+            </Stack>
+        </Paper>
     );
 }

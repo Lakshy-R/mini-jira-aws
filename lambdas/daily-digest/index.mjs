@@ -7,13 +7,14 @@ const ddbClient = new DynamoDBClient({ region: process.env.AWS_REGION || 'eu-nor
 const docClient = DynamoDBDocumentClient.from(ddbClient);
 const snsClient = new SNSClient({ region: process.env.AWS_REGION || 'eu-north-1' });
 const cwClient = new CloudWatchClient({ region: process.env.AWS_REGION || 'eu-north-1' });
+const CW_NAMESPACE = process.env.CW_NAMESPACE || 'MiniJira';
 
 export const handler = async (event) => {
   console.log('Daily digest triggered by EventBridge:', JSON.stringify(event));
 
   try {
     const todayStr = new Date().toISOString().split('T')[0];
-    
+
     const { Items } = await docClient.send(new ScanCommand({
       TableName: process.env.DYNAMODB_TASKS_TABLE || 'Tasks'
     }));
@@ -27,7 +28,7 @@ export const handler = async (event) => {
       if (task.status === 'DONE') return false;
       if (!task.assigneeId) return false;
       if (!task.deadline) return false;
-      
+
       const deadlineDate = new Date(task.deadline).toISOString().split('T')[0];
       return deadlineDate <= todayStr;
     });
@@ -38,7 +39,7 @@ export const handler = async (event) => {
     if (dueTasks.length > 0) {
       try {
         await cwClient.send(new PutMetricDataCommand({
-          Namespace: 'MiniJira/Tasks',
+          Namespace: CW_NAMESPACE,
           MetricData: [{
             MetricName: 'OverdueTasks',
             Dimensions: [{ Name: 'Environment', Value: process.env.ENV || 'production' }],
@@ -69,13 +70,19 @@ export const handler = async (event) => {
 
     for (const [assigneeId, tasks] of Object.entries(tasksByAssignee)) {
       const taskListStr = tasks.map(t => `- ${t.title} (Status: ${t.status}, Deadline: ${new Date(t.deadline).toLocaleDateString()})`).join('\n');
-      
+
       const message = `Hello Assignee ${assigneeId},\n\nYou have ${tasks.length} task(s) due today or overdue:\n\n${taskListStr}\n\nPlease update their status on the Mini-Jira dashboard.\n\nBest,\nMini-Jira System`;
-      
+
       await snsClient.send(new PublishCommand({
         TopicArn: topicArn,
         Subject: `Mini-Jira Daily Digest - ${tasks.length} tasks due`,
-        Message: message
+        Message: message,
+        MessageAttributes: {
+          assigneeId: {
+            DataType: 'String',
+            StringValue: String(assigneeId),
+          }
+        }
       }));
       console.log(`Sent digest to assignee: ${assigneeId}`);
     }

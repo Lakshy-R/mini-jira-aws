@@ -2,6 +2,7 @@ import {
     DndContext,
     closestCenter,
 } from '@dnd-kit/core';
+import { Grid } from '@mui/material';
 
 import KanbanColumn from './KanbanColumn';
 import { tasksService } from '../../services/tasks.service';
@@ -44,19 +45,20 @@ export default function KanbanBoard({
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
         >
-            <div className="grid grid-cols-4 gap-4">
+            <Grid container spacing={2}>
                 {STATUSES.map(status => (
-                    <KanbanColumn
-                        key={status}
-                        status={status}
-                        title={status.replace('_', ' ')}
-                        tasks={tasks.filter(
-                            t => t.status === status
-                        )}
-                        onTaskClick={onTaskClick}
-                    />
+                    <Grid item xs={12} md={3} key={status}>
+                        <KanbanColumn
+                            status={status}
+                            title={status.replace('_', ' ')}
+                            tasks={tasks.filter(
+                                t => t.status === status
+                            )}
+                            onTaskClick={onTaskClick}
+                        />
+                    </Grid>
                 ))}
-            </div>
+            </Grid>
         </DndContext>
     );
 }

@@ -13,6 +13,9 @@ router.get('/', commentsController.getComments);
 // POST /api/tasks/:taskId/comments
 router.post('/', commentsController.createComment);
 
+// PATCH /api/tasks/:taskId/comments/:commentId
+router.patch('/:commentId', commentsController.updateComment);
+
 // DELETE /api/tasks/:taskId/comments/:commentId
 router.delete('/:commentId', commentsController.deleteComment);
 

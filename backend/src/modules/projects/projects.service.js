@@ -24,7 +24,29 @@ export const projectsService = {
         return all.filter(p => p.teamId === user.teamId);
     },
 
-    async getProjectById(id) {
-        return await projectsRepository.getById(id);
+    async getProjectById(id, user) {
+        const project = await projectsRepository.getById(id);
+        if (!project) return null;
+
+        if (user?.role !== 'manager' && project.teamId !== user?.teamId) {
+            return null;
+        }
+
+        return project;
+    },
+
+    async updateProject(id, data, user) {
+        const existing = await projectsRepository.getById(id);
+        if (!existing) return null;
+
+        return await projectsRepository.update(id, data);
+    },
+
+    async deleteProject(id, user) {
+        const existing = await projectsRepository.getById(id);
+        if (!existing) return null;
+
+        await projectsRepository.delete(id);
+        return true;
     },
 };

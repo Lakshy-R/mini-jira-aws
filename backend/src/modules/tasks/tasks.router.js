@@ -34,6 +34,13 @@ router.patch(
     tasksController.updateStatus
 );
 
+// UPDATE task details (manager only)
+router.patch(
+    '/:id',
+    requireRole('manager'),
+    tasksController.update
+);
+
 // UPDATE task image
 router.patch(
     '/:id/image',

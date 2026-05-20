@@ -1,4 +1,13 @@
 import { useDraggable } from '@dnd-kit/core';
+import {
+    Box,
+    Card,
+    CardContent,
+    CardMedia,
+    Chip,
+    Stack,
+    Typography,
+} from '@mui/material';
 
 export default function TaskCard({ task, onClick }) {
     const { attributes, listeners, setNodeRef, transform, isDragging } =
@@ -17,62 +26,62 @@ export default function TaskCard({ task, onClick }) {
     const thumbnailUrl = task.presignedUrl;
 
     return (
-        <div
+        <Card
             ref={setNodeRef}
             style={style}
-            className="bg-white rounded-xl shadow border hover:shadow-md transition-shadow"
+            sx={{
+                boxShadow: isDragging ? 8 : 2,
+                cursor: isDragging ? 'grabbing' : 'default',
+            }}
         >
-            {/* Drag handle — only this area triggers drag */}
-            <div
+            <Box
                 {...listeners}
                 {...attributes}
-                className="px-4 pt-3 pb-1 cursor-grab active:cursor-grabbing flex items-center gap-1.5"
                 title="Drag to move"
+                sx={{
+                    px: 2,
+                    pt: 1.5,
+                    pb: 0.5,
+                    cursor: 'grab',
+                    color: 'text.disabled',
+                    fontSize: 12,
+                }}
             >
-                <svg className="w-3.5 h-3.5 text-gray-300 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <circle cx="7" cy="5" r="1.5"/>
-                    <circle cx="13" cy="5" r="1.5"/>
-                    <circle cx="7" cy="10" r="1.5"/>
-                    <circle cx="13" cy="10" r="1.5"/>
-                    <circle cx="7" cy="15" r="1.5"/>
-                    <circle cx="13" cy="15" r="1.5"/>
-                </svg>
-                <span className="text-xs text-gray-300">drag</span>
-            </div>
+                drag
+            </Box>
 
-            {/* Clickable card body — opens modal */}
-            <div
-                onClick={() => !isDragging && onClick?.()}
-                className="px-4 pb-4 cursor-pointer"
-            >
+            <Box onClick={() => !isDragging && onClick?.()} sx={{ cursor: 'pointer' }}>
                 {thumbnailUrl && (
-                    <img
-                        src={thumbnailUrl}
+                    <CardMedia
+                        component="img"
+                        height="140"
+                        image={thumbnailUrl}
                         alt={task.title}
-                        className="w-full h-32 object-cover rounded-lg mb-3 pointer-events-none"
+                        sx={{ objectFit: 'cover' }}
                         onError={(e) => { e.target.style.display = 'none'; }}
                     />
                 )}
+                <CardContent>
+                    <Stack spacing={1}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center">
+                            <Typography variant="subtitle1" fontWeight={700} color="text.primary">
+                                {task.title}
+                            </Typography>
+                            <Chip label={task.priority} size="small" />
+                        </Stack>
 
-                <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-base text-gray-900">
-                        {task.title}
-                    </h3>
-                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded font-medium shrink-0 ml-2">
-                        {task.priority}
-                    </span>
-                </div>
+                        {task.description && (
+                            <Typography variant="body2" color="text.secondary" noWrap>
+                                {task.description}
+                            </Typography>
+                        )}
 
-                {task.description && (
-                    <p className="text-sm text-gray-500 mt-1.5 line-clamp-2">
-                        {task.description}
-                    </p>
-                )}
-
-                <div className="mt-3 text-xs text-gray-400">
-                    Assignee: {task.assigneeId}
-                </div>
-            </div>
-        </div>
+                        <Typography variant="caption" color="text.secondary">
+                            Assignee: {task.assigneeId}
+                        </Typography>
+                    </Stack>
+                </CardContent>
+            </Box>
+        </Card>
     );
 }

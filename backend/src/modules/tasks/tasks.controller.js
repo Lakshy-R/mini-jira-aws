@@ -1,6 +1,16 @@
 import { tasksService } from './tasks.service.js';
-import { tasksRepository } from './tasks.repository.js';
 import { getSignedImageUrl } from '../../lib/s3.js';
+
+const handleTaskError = (err, res) => {
+    if (err.message === 'NOT_FOUND') {
+        return res.status(404).json({ error: 'Task not found' });
+    }
+    if (err.message === 'FORBIDDEN') {
+        return res.status(403).json({ error: 'Forbidden' });
+    }
+    console.error(err);
+    return res.status(500).json({ error: err.message });
+};
 
 export const tasksController = {
     async create(req, res) {
@@ -39,22 +49,27 @@ export const tasksController = {
     async getOne(req, res) {
         try {
             const task = await tasksService.getTaskById(
-                req.params.id
+                req.params.id,
+                req.user
             );
-
-            if (!task) {
-                return res.status(404).json({
-                    error: 'Task not found',
-                });
-            }
 
             res.json(task);
         } catch (err) {
-            console.error(err);
+            return handleTaskError(err, res);
+        }
+    },
 
-            res.status(500).json({
-                error: err.message,
-            });
+    async update(req, res) {
+        try {
+            const updated = await tasksService.updateTask(
+                req.params.id,
+                req.body,
+                req.user
+            );
+
+            res.json(updated);
+        } catch (err) {
+            return handleTaskError(err, res);
         }
     },
 
@@ -63,16 +78,13 @@ export const tasksController = {
             const task =
                 await tasksService.updateTaskStatus(
                     req.params.id,
-                    req.body.status
+                    req.body.status,
+                    req.user
                 );
 
             res.json(task);
         } catch (err) {
-            console.error(err);
-
-            res.status(500).json({
-                error: err.message,
-            });
+            return handleTaskError(err, res);
         }
     },
 
@@ -88,47 +100,56 @@ export const tasksController = {
                 req.user
             );
 
-            if (!updated) {
-                return res.status(404).json({ message: 'Task not found.' });
-            }
-
             res.status(200).json({
                 message: 'Task image updated.',
                 imageUrl: updated.imageUrl,
                 imageVersions: updated.imageVersions,
             });
         } catch (err) {
+            if (err.message === 'NOT_FOUND') {
+                return res.status(404).json({ message: 'Task not found.' });
+            }
+            if (err.message === 'FORBIDDEN') {
+                return res.status(403).json({ message: 'Forbidden.' });
+            }
             console.error('[Tasks] updateImage error:', err);
-            res.status(500).json({ message: 'Failed to update task image.' });
+            return res.status(500).json({ message: 'Failed to update task image.' });
         }
     },
 
     async delete(req, res) {
         try {
-            await tasksService.deleteTask(req.params.id);
+            await tasksService.deleteTask(
+                req.params.id,
+                req.user
+            );
 
             res.json({
                 success: true,
             });
         } catch (err) {
-            console.error(err);
-
-            res.status(500).json({
-                error: err.message,
-            });
+            return handleTaskError(err, res);
         }
     },
 
     async getImageUrl(req, res) {
         try {
-            const task = await tasksRepository.getById(req.params.id);
-            if (!task) return res.status(404).json({ error: 'Task not found' });
+            const task = await tasksService.getTaskById(
+                req.params.id,
+                req.user
+            );
 
             const signedUrl = await getSignedImageUrl(task.imageUrl);
             res.json({ url: signedUrl });
         } catch (err) {
+            if (err.message === 'NOT_FOUND') {
+                return res.status(404).json({ error: 'Task not found' });
+            }
+            if (err.message === 'FORBIDDEN') {
+                return res.status(403).json({ error: 'Forbidden' });
+            }
             console.error('[Tasks] getImageUrl error:', err);
-            res.status(500).json({ error: 'Failed to generate image URL.' });
+            return res.status(500).json({ error: 'Failed to generate image URL.' });
         }
     },
 };

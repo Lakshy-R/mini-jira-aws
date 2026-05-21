@@ -1,145 +1,154 @@
-import { useEffect, useState, useCallback } from 'react';
-import { tasksService, createTask } from '../services/tasks.service';
+import { useState, useCallback } from 'react';
+import { LayoutGrid, Filter, X } from 'lucide-react';
+import { useTasks, useCreateTask } from '../hooks/useTasks';
 import { usersService } from '../services/users.service';
+import { useQuery } from '@tanstack/react-query';
 import { useTasksStore } from '../store/tasks.store';
 import { useAuthStore } from '../store/auth.store';
 import KanbanBoard from '../components/kanban/KanbanBoard';
 import TaskForm from '../components/tasks/TaskForm';
 import TaskDetailModal from '../components/tasks/TaskDetailModal';
-import { toast } from '../store/toast.store';
+import { Select } from '../components/ui/input';
+import { Button } from '../components/ui/button';
+import { Skeleton } from '../components/ui/skeleton';
+import { cn } from '../lib/utils';
 
-function KanbanSkeleton() {
+function PageSkeleton() {
   return (
-    <div className="grid grid-cols-4 gap-4 animate-pulse">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 animate-pulse">
       {[0, 1, 2, 3].map((col) => (
-        <div key={col} className="bg-gray-100 rounded-xl p-4 min-h-[400px]">
-          <div className="h-5 w-24 bg-gray-200 rounded mb-4" />
-          {[0, 1, 2].map((card) => (
-            <div key={card} className="bg-white rounded-xl p-3 mb-3 space-y-2">
-              <div className="h-4 bg-gray-100 rounded w-3/4" />
-              <div className="h-3 bg-gray-100 rounded w-full" />
-              <div className="h-3 bg-gray-100 rounded w-1/2" />
-            </div>
-          ))}
+        <div key={col} className="space-y-3">
+          <div className="flex items-center gap-2 mb-3">
+            <Skeleton className="w-2 h-2 rounded-full" />
+            <Skeleton className="h-3 w-20" />
+            <Skeleton className="h-5 w-6 rounded-full ml-auto" />
+          </div>
+          <div className="rounded-xl border-2 border-t-4 border-border p-2 min-h-[400px] space-y-2">
+            {[0, 1, 2].map((card) => (
+              <div key={card} className="bg-card rounded-xl border border-border p-4 space-y-3">
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-3 w-full" />
+                <Skeleton className="h-3 w-1/2" />
+                <div className="flex justify-between pt-1">
+                  <Skeleton className="h-5 w-5 rounded-full" />
+                  <Skeleton className="h-4 w-16 rounded-full" />
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       ))}
     </div>
   );
 }
 
+function EmptyState({ isManager }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-32 text-center">
+      <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
+        <LayoutGrid size={28} className="text-muted-foreground" />
+      </div>
+      <h3 className="text-base font-semibold text-foreground mb-1">No tasks yet</h3>
+      <p className="text-sm text-muted-foreground max-w-xs">
+        {isManager
+          ? 'Create your first task to get the board started.'
+          : "Your manager hasn't assigned any tasks yet. Check back soon."}
+      </p>
+    </div>
+  );
+}
+
 export default function DashboardPage() {
-  const { tasks, setTasks } = useTasksStore();
   const { user } = useAuthStore();
   const isManager = user?.role === 'manager';
+  const { setTasks } = useTasksStore();
 
   const [selectedTask, setSelectedTask] = useState(null);
-  const [loading, setLoading] = useState(true);
   const [teamFilter, setTeamFilter] = useState('');
-  const [teams, setTeams] = useState([]);
 
-  const loadTasks = useCallback(async () => {
-    try {
-      const result = await tasksService.getTasks();
-      // API now returns { items, lastKey }
-      const items = result?.items ?? result ?? [];
-      setTasks(items);
-    } catch (err) {
-      toast.error(err.displayMessage || 'Failed to load tasks');
-    } finally {
-      setLoading(false);
-    }
-  }, [setTasks]);
+  const { data: tasks = [], isLoading, refetch } = useTasks();
+  const createTask = useCreateTask();
 
-  useEffect(() => {
-    loadTasks();
-    if (isManager) {
-      usersService.getTeams().then(setTeams).catch(() => {});
-    }
-  }, [loadTasks, isManager]);
+  const { data: teams = [] } = useQuery({
+    queryKey: ['teams'],
+    queryFn: () => usersService.getTeams(),
+    enabled: isManager,
+    staleTime: 300_000,
+  });
 
-  const handleCreateTask = async (taskData, imageFile) => {
-    await createTask(taskData, imageFile);
-    await loadTasks();
-  };
+  const handleCreateTask = useCallback(async (taskData, imageFile) => {
+    await createTask.mutateAsync({ taskData, imageFile });
+  }, [createTask]);
 
-  const handleTaskUpdated = (updatedTask) => {
-    setTasks(tasks.map((t) => (t.taskId === updatedTask.taskId ? updatedTask : t)));
-  };
+  const handleTaskUpdated = useCallback((updatedTask) => {
+    setSelectedTask(updatedTask);
+  }, []);
 
-  const handleTaskDeleted = (taskId) => {
-    setTasks(tasks.filter((t) => t.taskId !== taskId));
+  const handleTaskDeleted = useCallback((taskId) => {
     setSelectedTask(null);
-    toast.success('Task deleted');
-  };
+  }, []);
 
   const visibleTasks = teamFilter
     ? tasks.filter((t) => t.teamId === teamFilter)
     : tasks;
 
   return (
-    <div>
+    <div className="space-y-6">
       {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Board</h1>
-          <p className="text-sm text-gray-400 mt-0.5">
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">Board</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
             {isManager
               ? `${tasks.length} task${tasks.length !== 1 ? 's' : ''} across all teams`
-              : `${tasks.length} task${tasks.length !== 1 ? 's' : ''} for your team`}
+              : `${tasks.length} task${tasks.length !== 1 ? 's' : ''} in your team`}
           </p>
         </div>
 
-        {/* Manager team filter */}
-        {isManager && teams.length > 0 && (
-          <div className="flex items-center gap-2">
-            <label className="text-xs font-medium text-gray-500 shrink-0">Filter by team</label>
-            <select
-              value={teamFilter}
-              onChange={(e) => setTeamFilter(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            >
-              <option value="">All teams</option>
-              {teams.map((t) => (
-                <option key={t.teamId} value={t.teamId}>{t.name}</option>
-              ))}
-            </select>
-            {teamFilter && (
-              <button
-                onClick={() => setTeamFilter('')}
-                className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+        <div className="flex items-center gap-3">
+          {/* Manager team filter */}
+          {isManager && teams.length > 0 && (
+            <div className="flex items-center gap-2">
+              <Filter size={14} className="text-muted-foreground" />
+              <Select
+                value={teamFilter}
+                onChange={(e) => setTeamFilter(e.target.value)}
+                className="h-8 text-xs pr-8 w-auto"
               >
-                Clear
-              </button>
-            )}
-          </div>
-        )}
+                <option value="">All teams</option>
+                {teams.map((t) => (
+                  <option key={t.teamId} value={t.teamId}>{t.name}</option>
+                ))}
+              </Select>
+              {teamFilter && (
+                <button
+                  onClick={() => setTeamFilter('')}
+                  className="p-1 rounded text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          )}
+
+          {isManager && <TaskForm onTaskCreated={handleCreateTask} />}
+        </div>
       </div>
 
-      {/* Task creation — managers only */}
-      {isManager && (
-        <TaskForm onTaskCreated={handleCreateTask} />
-      )}
-
-      {/* Board */}
-      {loading ? (
-        <KanbanSkeleton />
+      {/* Board content */}
+      {isLoading ? (
+        <PageSkeleton />
       ) : tasks.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 text-center">
-          <div className="text-5xl mb-4">📋</div>
-          <h3 className="text-lg font-semibold text-gray-700 mb-1">No tasks yet</h3>
-          <p className="text-sm text-gray-400">
-            {isManager ? 'Create your first task using the button above.' : 'Your manager hasn\'t assigned any tasks yet.'}
-          </p>
-        </div>
+        <EmptyState isManager={isManager} />
       ) : (
         <KanbanBoard
           tasks={visibleTasks}
-          reloadTasks={loadTasks}
+          reloadTasks={refetch}
           onTaskClick={setSelectedTask}
         />
       )}
 
-      {/* Task detail modal */}
+      {/* Task detail panel */}
       {selectedTask && (
         <TaskDetailModal
           task={selectedTask}

@@ -1,52 +1,43 @@
-import { useState, useEffect, useRef } from "react";
-import { tasksService } from "../../services/tasks.service";
-import { useAuthStore } from "../../store/auth.store";
+import { useState, useEffect, useRef } from 'react';
+import { Send, Trash2 } from 'lucide-react';
+import { tasksService } from '../../services/tasks.service';
+import { useAuthStore } from '../../store/auth.store';
+import { Avatar } from '../ui/avatar';
+import { Button } from '../ui/button';
+import { Skeleton } from '../ui/skeleton';
+import { formatRelativeTime } from '../../lib/utils';
 
-/**
- * CommentThread
- * Props:
- *   taskId   string   — the task whose comments to show
- */
 export default function CommentThread({ taskId }) {
   const { user } = useAuthStore();
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
-  const [content, setContent] = useState("");
-  const [error, setError] = useState("");
+  const [content, setContent] = useState('');
+  const [error, setError] = useState('');
   const bottomRef = useRef(null);
 
-  const fetchComments = async () => {
-    try {
-      const data = await tasksService.getComments(taskId);
-      setComments(data);
-    } catch (err) {
-      console.error("Failed to load comments:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchComments();
+    tasksService.getComments(taskId)
+      .then(setComments)
+      .catch(console.error)
+      .finally(() => setLoading(false));
   }, [taskId]);
 
-  // Scroll to bottom when new comments arrive
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [comments]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!content.trim()) return;
-    setError("");
+    setError('');
     setPosting(true);
     try {
       const newComment = await tasksService.postComment(taskId, content.trim());
       setComments((prev) => [...prev, newComment]);
-      setContent("");
+      setContent('');
     } catch (err) {
-      setError(err.response?.data?.message || "Failed to post comment.");
+      setError(err.response?.data?.message || 'Failed to post comment.');
     } finally {
       setPosting(false);
     }
@@ -56,27 +47,24 @@ export default function CommentThread({ taskId }) {
     try {
       await tasksService.deleteComment(taskId, commentId);
       setComments((prev) => prev.filter((c) => c.commentId !== commentId));
-    } catch (err) {
-      console.error("Failed to delete comment:", err);
+    } catch {
+      /* silent */
     }
   };
 
   const handleKeyDown = (e) => {
-    // Cmd/Ctrl + Enter submits
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-      handleSubmit(e);
-    }
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') handleSubmit(e);
   };
 
   if (loading) {
     return (
-      <div className="flex flex-col gap-3 animate-pulse">
-        {[1, 2].map((i) => (
+      <div className="space-y-4">
+        {[0, 1].map((i) => (
           <div key={i} className="flex gap-3">
-            <div className="w-8 h-8 rounded-full bg-gray-200 shrink-0" />
+            <Skeleton className="w-7 h-7 rounded-full shrink-0" />
             <div className="flex-1 space-y-2">
-              <div className="h-3 w-24 bg-gray-200 rounded" />
-              <div className="h-3 w-full bg-gray-200 rounded" />
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-10 w-full rounded-lg" />
             </div>
           </div>
         ))}
@@ -87,18 +75,18 @@ export default function CommentThread({ taskId }) {
   return (
     <div className="flex flex-col gap-4">
       {/* Comment list */}
-      <div className="flex flex-col gap-4 max-h-80 overflow-y-auto pr-1">
+      <div className="flex flex-col gap-3 max-h-64 overflow-y-auto pr-1">
         {comments.length === 0 ? (
-          <p className="text-sm text-gray-400 text-center py-4">
-            No comments yet. Be the first to comment.
-          </p>
+          <div className="py-6 text-center">
+            <p className="text-sm text-muted-foreground">No comments yet. Start the conversation.</p>
+          </div>
         ) : (
           comments.map((comment) => (
             <CommentItem
               key={comment.commentId}
               comment={comment}
               currentUserId={user?.sub || user?.userId}
-              isManager={user?.role === "manager"}
+              isManager={user?.role === 'manager'}
               onDelete={handleDelete}
             />
           ))
@@ -107,37 +95,31 @@ export default function CommentThread({ taskId }) {
       </div>
 
       {/* Divider */}
-      <div className="border-t border-gray-100" />
+      <div className="border-t border-border" />
 
-      {/* Input form */}
-      <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-        <div className="flex gap-3">
-          {/* Current user avatar */}
-          <Avatar name={user?.name || user?.email || "You"} size="sm" />
-
-          <div className="flex-1 flex flex-col gap-2">
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Add a comment… (⌘+Enter to send)"
-              rows={3}
-              className="w-full rounded-lg border border-gray-200 bg-white text-sm text-gray-900 placeholder-gray-400 p-3 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-            />
-
-            {error && (
-              <p className="text-xs text-red-500">{error}</p>
-            )}
-
-            <div className="flex justify-end">
-              <button
-                type="submit"
-                disabled={posting || !content.trim()}
-                className="bg-black text-white px-4 py-2 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {posting ? "Posting…" : "Comment"}
-              </button>
-            </div>
+      {/* Input */}
+      <form onSubmit={handleSubmit} className="flex gap-3">
+        <Avatar name={user?.email || 'You'} size="sm" className="shrink-0 mt-1" />
+        <div className="flex-1 space-y-2">
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Write a comment… (⌘↵ to send)"
+            rows={3}
+            className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-transparent transition-shadow"
+          />
+          {error && <p className="text-xs text-destructive">{error}</p>}
+          <div className="flex justify-end">
+            <Button
+              type="submit"
+              size="sm"
+              disabled={posting || !content.trim()}
+              className="gap-1.5"
+            >
+              <Send size={13} />
+              {posting ? 'Posting…' : 'Comment'}
+            </Button>
           </div>
         </div>
       </form>
@@ -148,52 +130,41 @@ export default function CommentThread({ taskId }) {
 function CommentItem({ comment, currentUserId, isManager, onDelete }) {
   const canDelete = isManager || comment.authorId === currentUserId;
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const authorDisplay = comment.authorName || comment.authorEmail?.split('@')[0] || 'User';
 
   return (
     <div className="flex gap-3 group">
-      <Avatar name={comment.authorName} size="sm" />
-
+      <Avatar name={authorDisplay} size="sm" className="shrink-0" />
       <div className="flex-1 min-w-0">
-        {/* Header row */}
         <div className="flex items-baseline justify-between gap-2 mb-1">
-          <span className="text-sm font-medium text-gray-900 truncate">
-            {comment.authorName}
-          </span>
-          <span className="text-xs text-gray-400 shrink-0">
-            {formatTime(comment.createdAt)}
-          </span>
+          <span className="text-xs font-semibold text-foreground capitalize">{authorDisplay}</span>
+          <span className="text-[10px] text-muted-foreground shrink-0">{formatRelativeTime(comment.createdAt)}</span>
         </div>
-
-        {/* Content */}
-        <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">
-          {comment.content}
-        </p>
-
-        {/* Delete */}
+        <div className="bg-muted rounded-xl px-3 py-2">
+          <p className="text-sm text-foreground whitespace-pre-wrap break-words">{comment.content}</p>
+        </div>
         {canDelete && (
-          <div className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
             {confirmDelete ? (
-              <span className="text-xs text-gray-500">
-                Delete?{" "}
+              <span className="text-xs text-muted-foreground">
+                Delete?{' '}
                 <button
                   onClick={() => onDelete(comment.commentId)}
-                  className="text-red-500 hover:text-red-600 font-medium"
+                  className="text-destructive hover:underline font-medium"
                 >
                   Yes
                 </button>
-                {" · "}
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  className="hover:underline"
-                >
+                {' · '}
+                <button onClick={() => setConfirmDelete(false)} className="hover:underline">
                   Cancel
                 </button>
               </span>
             ) : (
               <button
                 onClick={() => setConfirmDelete(true)}
-                className="text-xs text-gray-400 hover:text-red-500 transition-colors"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
               >
+                <Trash2 size={11} />
                 Delete
               </button>
             )}
@@ -202,48 +173,4 @@ function CommentItem({ comment, currentUserId, isManager, onDelete }) {
       </div>
     </div>
   );
-}
-
-function Avatar({ name = "?", size = "sm" }) {
-  const initials = name
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
-  const colors = [
-    "bg-blue-100 text-blue-700",
-    "bg-purple-100 text-purple-700",
-    "bg-teal-100 text-teal-700",
-    "bg-amber-100 text-amber-700",
-  ];
-  const color = colors[name.charCodeAt(0) % colors.length];
-
-  const sizeClass = size === "sm" ? "w-8 h-8 text-xs" : "w-10 h-10 text-sm";
-
-  return (
-    <div
-      className={`${sizeClass} ${color} rounded-full flex items-center justify-center font-medium shrink-0`}
-      aria-hidden="true"
-    >
-      {initials}
-    </div>
-  );
-}
-
-function formatTime(iso) {
-  if (!iso) return "";
-  const date = new Date(iso);
-  const now = new Date();
-  const diffMs = now - date;
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString();
 }

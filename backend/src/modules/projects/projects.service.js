@@ -1,12 +1,13 @@
 import { projectsRepository } from './projects.repository.js';
 import { v4 as uuid } from 'uuid';
+import { ForbiddenError, NotFoundError } from '../../middleware/error.middleware.js';
 
 export const projectsService = {
   async createProject(data, user) {
     return await projectsRepository.create({
       projectId: uuid(),
-      name: data.name,
-      description: data.description || '',
+      name: data.name.trim(),
+      description: (data.description || '').trim(),
       teamId: data.teamId,
       createdBy: user.sub,
       createdAt: new Date().toISOString(),
@@ -14,37 +15,40 @@ export const projectsService = {
     });
   },
 
-  async getProjects(user) {
-    const all = await projectsRepository.getAll();
-    if (user.role === 'manager') return all;
-    return all.filter((p) => p.teamId === user.teamId);
+  async getProjects(user, options = {}) {
+    if (user.role === 'manager') {
+      const result = await projectsRepository.getAll(options);
+      return result.items;
+    }
+    const result = await projectsRepository.getByTeam(user.teamId, options);
+    return result.items;
   },
 
   async getProjectById(id, user) {
     const project = await projectsRepository.getById(id);
-    if (!project) return null;
+    if (!project) throw new NotFoundError('Project');
+
     if (user.role !== 'manager' && project.teamId !== user.teamId) {
-      const err = new Error('FORBIDDEN');
-      err.code = 'FORBIDDEN';
-      throw err;
+      throw new ForbiddenError();
     }
     return project;
   },
 
   async updateProject(id, fields, user) {
     const project = await projectsRepository.getById(id);
-    if (!project) return null;
-    if (user.role !== 'manager' && project.teamId !== user.teamId) {
-      const err = new Error('FORBIDDEN');
-      err.code = 'FORBIDDEN';
-      throw err;
-    }
+    if (!project) throw new NotFoundError('Project');
+
+    if (user.role !== 'manager') throw new ForbiddenError();
+
     return await projectsRepository.update(id, fields);
   },
 
   async deleteProject(id, user) {
     const project = await projectsRepository.getById(id);
-    if (!project) return false;
+    if (!project) throw new NotFoundError('Project');
+
+    if (user.role !== 'manager') throw new ForbiddenError();
+
     return await projectsRepository.delete(id);
   },
 };

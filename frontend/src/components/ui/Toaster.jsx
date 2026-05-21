@@ -1,49 +1,51 @@
 import { createPortal } from 'react-dom';
+import { CheckCircle, XCircle, Info, X } from 'lucide-react';
 import { useToastStore } from '../../store/toast.store';
+import { cn } from '../../lib/utils';
 
-const icons = {
-  success: (
-    <svg className="w-4 h-4 text-green-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-    </svg>
-  ),
-  error: (
-    <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-    </svg>
-  ),
-  info: (
-    <svg className="w-4 h-4 text-blue-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-    </svg>
-  ),
-};
-
-const borderColors = {
-  success: 'border-l-green-500',
-  error: 'border-l-red-500',
-  info: 'border-l-blue-500',
+const CONFIGS = {
+  success: {
+    icon: CheckCircle,
+    className: 'border-l-emerald-500',
+    iconClass: 'text-emerald-500',
+  },
+  error: {
+    icon: XCircle,
+    className: 'border-l-red-500',
+    iconClass: 'text-red-500',
+  },
+  info: {
+    icon: Info,
+    className: 'border-l-blue-500',
+    iconClass: 'text-blue-500',
+  },
 };
 
 function ToastItem({ toast, onRemove }) {
+  const { icon: Icon, className, iconClass } = CONFIGS[toast.type] || CONFIGS.info;
+
   return (
     <div
-      className={`flex items-start gap-3 bg-white border border-gray-200 border-l-4 ${borderColors[toast.type]} rounded-lg shadow-lg px-4 py-3 w-80 animate-in slide-in-from-right-full duration-300`}
+      className={cn(
+        'flex items-start gap-3 bg-card border border-border border-l-4 rounded-xl shadow-[0_8px_24px_-4px_rgba(0,0,0,0.12)]',
+        'px-4 py-3 w-80 animate-slide-in-right',
+        className
+      )}
     >
-      {icons[toast.type]}
-      <p className="text-sm text-gray-800 flex-1 leading-snug">{toast.message}</p>
+      <Icon size={16} className={cn('shrink-0 mt-0.5', iconClass)} />
+      <p className="text-sm text-foreground flex-1 leading-snug">{toast.message}</p>
       <button
         onClick={() => onRemove(toast.id)}
-        className="text-gray-300 hover:text-gray-500 transition-colors shrink-0 mt-0.5"
+        className="text-muted-foreground hover:text-foreground transition-colors shrink-0 mt-0.5 p-0.5 rounded"
         aria-label="Dismiss"
       >
-        ✕
+        <X size={13} />
       </button>
     </div>
   );
 }
 
-export default function Toaster() {
+export function Toaster() {
   const { toasts, removeToast } = useToastStore();
 
   return createPortal(
@@ -55,3 +57,5 @@ export default function Toaster() {
     document.body
   );
 }
+
+export default Toaster;

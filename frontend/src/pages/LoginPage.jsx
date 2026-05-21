@@ -1,43 +1,42 @@
 import { useState, useEffect } from 'react';
 import { confirmSignIn, getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
+import { Eye, EyeOff, Zap } from 'lucide-react';
 import { login } from '../services/auth.service';
 import { useAuthStore } from '../store/auth.store';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import { Button } from '../components/ui/button';
+import { Input, Label } from '../components/ui/input';
+import { cn } from '../lib/utils';
+
+const resolveUserWithRole = async () => {
+  const cognitoUser = await getCurrentUser();
+  const session = await fetchAuthSession();
+  const idToken = session.tokens?.idToken;
+  const role = idToken?.payload?.['custom:role'] || 'employee';
+  const teamId = idToken?.payload?.['custom:teamId'] || null;
+  const email = idToken?.payload?.email || cognitoUser.username;
+  return { ...cognitoUser, role, teamId, email };
+};
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const setAuth = useAuthStore((state) => state.setAuth);
-  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const { setAuth, isAuthenticated } = useAuthStore();
 
   useEffect(() => {
     if (isAuthenticated) navigate('/dashboard', { replace: true });
   }, [isAuthenticated, navigate]);
 
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [needsNewPassword, setNeedsNewPassword] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
+  // If user navigates to /login from landing page, don't redirect back to /
+  // (the above effect already handles the authenticated case)
+
+  const [email, setEmail]                         = useState('');
+  const [password, setPassword]                   = useState('');
+  const [showPassword, setShowPassword]           = useState(false);
+  const [needsNewPassword, setNeedsNewPassword]   = useState(false);
+  const [newPassword, setNewPassword]             = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
-
-  const resolveUserWithRole = async () => {
-    const cognitoUser = await getCurrentUser();
-    const session = await fetchAuthSession();
-    const idToken = session.tokens?.idToken;
-
-    // Extract role and teamId from the ID token claims
-    const role = idToken?.payload?.['custom:role'] || 'employee';
-    const teamId = idToken?.payload?.['custom:teamId'] || null;
-    const userEmail = idToken?.payload?.email || cognitoUser.username;
-
-    return {
-      ...cognitoUser,
-      role,
-      teamId,
-      email: userEmail,
-    };
-  };
+  const [error, setError]                         = useState('');
+  const [loading, setLoading]                     = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -45,15 +44,11 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const { isSignedIn, nextStep } = await login(email, password);
-
       if (nextStep?.signInStep === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
         setNeedsNewPassword(true);
-        setLoading(false);
         return;
       }
-
       if (!isSignedIn) throw new Error(nextStep?.signInStep || 'Sign-in incomplete');
-
       const user = await resolveUserWithRole();
       setAuth(user);
       navigate('/dashboard');
@@ -83,108 +78,161 @@ export default function LoginPage() {
     }
   };
 
-  const inputCls = 'w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition placeholder-gray-400';
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-      <div className="w-full max-w-sm">
-
-        {/* Brand */}
-        <div className="text-center mb-8">
-          <div className="text-4xl font-bold text-indigo-600 mb-2">◈</div>
-          <h1 className="text-2xl font-bold text-gray-900">Mini Jira</h1>
-          <p className="text-sm text-gray-400 mt-1">Sign in to your workspace</p>
+    <div className="min-h-screen flex bg-background">
+      {/* Left panel — branding */}
+      <div className="hidden lg:flex lg:w-[45%] bg-sidebar flex-col justify-between p-12 relative overflow-hidden">
+        {/* Background pattern */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute top-[-10%] left-[-10%] w-96 h-96 rounded-full bg-primary" />
+          <div className="absolute bottom-[-10%] right-[-10%] w-80 h-80 rounded-full bg-indigo-400" />
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-8">
+        {/* Logo */}
+        <Link to="/" className="relative flex items-center gap-3 hover:opacity-80 transition-opacity">
+          <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center shadow-lg">
+            <Zap size={20} className="text-white" />
+          </div>
+          <div>
+            <p className="text-white font-bold text-lg leading-none">TaskFlow</p>
+            <p className="text-sidebar-muted text-xs leading-none mt-0.5">Project Management</p>
+          </div>
+        </Link>
+
+        {/* Testimonial */}
+        <div className="relative space-y-6">
+          <blockquote className="text-sidebar-foreground text-xl font-medium leading-relaxed">
+            "The cleanest way to manage your team's tasks and projects — built for speed and clarity."
+          </blockquote>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-indigo-500/30 flex items-center justify-center text-indigo-300 text-sm font-bold">
+              TF
+            </div>
+            <div>
+              <p className="text-sidebar-foreground text-sm font-semibold">TaskFlow Team</p>
+              <p className="text-sidebar-muted text-xs">Engineering Platform</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom features */}
+        <div className="relative grid grid-cols-2 gap-4">
+          {[
+            { label: 'Kanban Board', desc: 'Visual task management' },
+            { label: 'Real-time', desc: 'Live status updates' },
+            { label: 'Role-based', desc: 'Manager & employee flows' },
+            { label: 'Event-driven', desc: 'SNS/SQS notifications' },
+          ].map(({ label, desc }) => (
+            <div key={label} className="bg-sidebar-accent/60 rounded-xl p-3">
+              <p className="text-sidebar-foreground text-xs font-semibold">{label}</p>
+              <p className="text-sidebar-muted text-[11px] mt-0.5">{desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Right panel — form */}
+      <div className="flex-1 flex items-center justify-center px-6 py-12">
+        <div className="w-full max-w-sm space-y-8">
+
+          {/* Mobile logo */}
+          <div className="lg:hidden flex items-center gap-3 justify-center mb-8">
+            <div className="w-10 h-10 rounded-xl bg-primary flex items-center justify-center">
+              <Zap size={20} className="text-white" />
+            </div>
+            <span className="text-foreground font-bold text-xl">TaskFlow</span>
+          </div>
+
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">
+              {needsNewPassword ? 'Set new password' : 'Sign in'}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {needsNewPassword
+                ? 'Your account requires a new password to continue.'
+                : 'Welcome back — sign in to your workspace.'}
+            </p>
+          </div>
+
+          {error && (
+            <div className="bg-destructive/10 border border-destructive/30 text-destructive text-sm px-4 py-3 rounded-xl">
+              {error}
+            </div>
+          )}
+
           {!needsNewPassword ? (
             <form onSubmit={handleLogin} className="space-y-4">
-              <h2 className="text-base font-semibold text-gray-700 mb-4">Sign in</h2>
-
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2.5 rounded-lg">
-                  {error}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Email</label>
-                <input
+              <div className="space-y-1.5">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="you@company.com"
-                  className={inputCls}
-                  required
                   autoComplete="email"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className={inputCls}
                   required
-                  autoComplete="current-password"
+                  className="h-10"
                 />
               </div>
 
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-indigo-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm mt-2"
-              >
+              <div className="space-y-1.5">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete="current-password"
+                    required
+                    className="h-10 pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
+
+              <Button type="submit" disabled={loading} className="w-full h-10 mt-2">
                 {loading ? 'Signing in…' : 'Sign in'}
-              </button>
+              </Button>
             </form>
           ) : (
             <form onSubmit={handleNewPassword} className="space-y-4">
-              <div>
-                <h2 className="text-base font-semibold text-gray-700 mb-1">Set a new password</h2>
-                <p className="text-sm text-gray-400">Your account requires a new password before you can continue.</p>
-              </div>
-
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 text-sm px-3 py-2.5 rounded-lg">
-                  {error}
-                </div>
-              )}
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">New password</label>
-                <input
+              <div className="space-y-1.5">
+                <Label htmlFor="new-password">New password</Label>
+                <Input
+                  id="new-password"
                   type="password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="At least 8 characters"
-                  className={inputCls}
                   required
+                  className="h-10"
                 />
               </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Confirm password</label>
-                <input
+              <div className="space-y-1.5">
+                <Label htmlFor="confirm-password">Confirm password</Label>
+                <Input
+                  id="confirm-password"
                   type="password"
                   value={confirmNewPassword}
                   onChange={(e) => setConfirmNewPassword(e.target.value)}
                   placeholder="Repeat your password"
-                  className={inputCls}
                   required
+                  className="h-10"
                 />
               </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-indigo-600 text-white py-2.5 rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm"
-              >
+              <Button type="submit" disabled={loading} className="w-full h-10 mt-2">
                 {loading ? 'Saving…' : 'Set Password & Continue'}
-              </button>
+              </Button>
             </form>
           )}
         </div>

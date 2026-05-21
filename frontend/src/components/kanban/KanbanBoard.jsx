@@ -55,7 +55,7 @@ export default function KanbanBoard({ tasks, reloadTasks, onTaskClick, loading =
       {/* Drag overlay */}
       <DragOverlay dropAnimation={{ duration: 150, easing: 'ease-out' }}>
         {activeTask ? (
-          <div className="rotate-2 scale-[1.03]">
+          <div className="rotate-2 scale-[1.03] opacity-95">
             <TaskCard task={activeTask} />
           </div>
         ) : null}

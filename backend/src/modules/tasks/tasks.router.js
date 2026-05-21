@@ -10,9 +10,10 @@ const router = express.Router();
 
 router.use(authMiddleware);
 
-router.get('/', tasksController.getAll);
-router.get('/:id', tasksController.getOne);
+router.get('/',              tasksController.getAll);
+router.get('/:id',           tasksController.getOne);
 router.get('/:id/image-url', tasksController.getImageUrl);
+router.get('/:id/history',   tasksController.getHistory);   // audit trail
 
 router.post('/',
   requireRole('manager'),

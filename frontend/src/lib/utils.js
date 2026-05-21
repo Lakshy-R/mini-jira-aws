@@ -16,14 +16,16 @@ export function getInitials(name = '') {
 }
 
 const AVATAR_COLORS = [
-  'bg-indigo-100 text-indigo-700',
-  'bg-violet-100 text-violet-700',
-  'bg-teal-100 text-teal-700',
-  'bg-amber-100 text-amber-700',
-  'bg-rose-100 text-rose-700',
-  'bg-sky-100 text-sky-700',
-  'bg-emerald-100 text-emerald-700',
-  'bg-orange-100 text-orange-700',
+  'bg-indigo-500/20 text-indigo-300 ring-indigo-500/20',
+  'bg-violet-500/20 text-violet-300 ring-violet-500/20',
+  'bg-teal-500/20 text-teal-300 ring-teal-500/20',
+  'bg-amber-500/20 text-amber-300 ring-amber-500/20',
+  'bg-rose-500/20 text-rose-300 ring-rose-500/20',
+  'bg-sky-500/20 text-sky-300 ring-sky-500/20',
+  'bg-emerald-500/20 text-emerald-300 ring-emerald-500/20',
+  'bg-orange-500/20 text-orange-300 ring-orange-500/20',
+  'bg-cyan-500/20 text-cyan-300 ring-cyan-500/20',
+  'bg-pink-500/20 text-pink-300 ring-pink-500/20',
 ];
 
 export function getAvatarColor(str = '') {
@@ -52,8 +54,8 @@ export function formatDeadline(deadline) {
   const d = new Date(deadline);
   const now = new Date();
   const diffDays = Math.ceil((d - now) / 86400000);
-  if (diffDays < 0)  return { label: `${Math.abs(diffDays)}d overdue`, variant: 'overdue' };
+  if (diffDays < 0)   return { label: `${Math.abs(diffDays)}d overdue`, variant: 'overdue' };
   if (diffDays === 0) return { label: 'Due today', variant: 'today' };
-  if (diffDays <= 3) return { label: `${diffDays}d left`, variant: 'soon' };
+  if (diffDays <= 3)  return { label: `${diffDays}d left`, variant: 'soon' };
   return { label: d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }), variant: 'normal' };
 }

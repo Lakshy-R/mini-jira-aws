@@ -6,11 +6,12 @@ export const Input = forwardRef(({ className, type = 'text', ...props }, ref) =>
     ref={ref}
     type={type}
     className={cn(
-      'flex h-9 w-full rounded-lg border border-border bg-card px-3 py-1 text-sm text-foreground shadow-xs',
+      'flex h-9 w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-1 text-sm text-foreground',
       'placeholder:text-muted-foreground',
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-transparent',
-      'disabled:cursor-not-allowed disabled:opacity-50',
-      'transition-shadow duration-150',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary/40',
+      'hover:border-white/[0.14] hover:bg-white/[0.06]',
+      'disabled:cursor-not-allowed disabled:opacity-40',
+      'transition-all duration-200',
       className
     )}
     {...props}
@@ -22,11 +23,12 @@ export const Textarea = forwardRef(({ className, ...props }, ref) => (
   <textarea
     ref={ref}
     className={cn(
-      'flex w-full rounded-lg border border-border bg-card px-3 py-2 text-sm text-foreground shadow-xs',
+      'flex w-full rounded-lg border border-white/[0.08] bg-white/[0.04] px-3 py-2 text-sm text-foreground',
       'placeholder:text-muted-foreground resize-none',
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-transparent',
-      'disabled:cursor-not-allowed disabled:opacity-50',
-      'transition-shadow duration-150',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary/40',
+      'hover:border-white/[0.14] hover:bg-white/[0.06]',
+      'disabled:cursor-not-allowed disabled:opacity-40',
+      'transition-all duration-200',
       className
     )}
     {...props}
@@ -38,10 +40,12 @@ export const Select = forwardRef(({ className, children, ...props }, ref) => (
   <select
     ref={ref}
     className={cn(
-      'flex h-9 w-full rounded-lg border border-border bg-card px-3 py-1 text-sm text-foreground shadow-xs',
-      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-transparent',
-      'disabled:cursor-not-allowed disabled:opacity-50',
-      'transition-shadow duration-150 cursor-pointer',
+      'flex h-9 w-full rounded-lg border border-white/[0.08] bg-card px-3 py-1 text-sm text-foreground',
+      'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary/40',
+      'hover:border-white/[0.14]',
+      'disabled:cursor-not-allowed disabled:opacity-40',
+      'transition-all duration-200 cursor-pointer',
+      '[&>option]:bg-card [&>option]:text-foreground',
       className
     )}
     {...props}
@@ -54,7 +58,10 @@ Select.displayName = 'Select';
 export function Label({ className, children, ...props }) {
   return (
     <label
-      className={cn('block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5', className)}
+      className={cn(
+        'block text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1.5',
+        className
+      )}
       {...props}
     >
       {children}
@@ -68,7 +75,7 @@ export function FormField({ label, required, children, className }) {
       {label && (
         <Label>
           {label}
-          {required && <span className="text-destructive ml-0.5">*</span>}
+          {required && <span className="text-red-400 ml-0.5">*</span>}
         </Label>
       )}
       {children}

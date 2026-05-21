@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, FolderKanban, Calendar, Users } from 'lucide-react';
+import { Plus, Trash2, FolderKanban, Calendar, Users, Sparkles } from 'lucide-react';
 import { useProjects, useCreateProject, useDeleteProject } from '../hooks/useProjects';
 import { usersService } from '../services/users.service';
 import { useQuery } from '@tanstack/react-query';
@@ -19,16 +19,23 @@ function ProjectCard({ project, isManager, onDelete, teamName }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
-    <div className="group bg-card border border-border rounded-2xl p-5 hover:shadow-[0_4px_12px_0_rgba(0,0,0,0.09)] transition-all duration-200 animate-fade-in">
+    <div className={cn(
+      'group relative bg-card border border-white/[0.06] rounded-2xl p-5',
+      'hover:border-white/[0.12] hover:shadow-[0_4px_24px_rgba(0,0,0,0.4)]',
+      'transition-all duration-200 animate-fade-in overflow-hidden'
+    )}>
+      {/* Hover glow accent */}
+      <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-primary/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+
       <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+        <div className="w-10 h-10 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center shrink-0 group-hover:bg-primary/15 transition-colors">
           <FolderKanban size={18} className="text-primary" />
         </div>
 
         {isManager && !confirmDelete && (
           <button
             onClick={() => setConfirmDelete(true)}
-            className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg text-muted-foreground hover:text-red-400 hover:bg-red-500/10"
             aria-label="Delete project"
           >
             <Trash2 size={14} />
@@ -40,11 +47,11 @@ function ProjectCard({ project, isManager, onDelete, teamName }) {
             <span className="text-muted-foreground">Delete?</span>
             <button
               onClick={() => onDelete(project.projectId)}
-              className="text-destructive hover:underline font-semibold"
+              className="text-red-400 hover:underline font-semibold"
             >
               Yes
             </button>
-            <span className="text-border">·</span>
+            <span className="text-white/20">·</span>
             <button
               onClick={() => setConfirmDelete(false)}
               className="text-muted-foreground hover:text-foreground"
@@ -200,7 +207,7 @@ export default function ProjectsPage() {
       {isLoading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="bg-card border border-border rounded-2xl p-5 space-y-3">
+            <div key={i} className="bg-card border border-white/[0.06] rounded-2xl p-5 space-y-3">
               <Skeleton className="w-10 h-10 rounded-xl" />
               <Skeleton className="h-5 w-1/2" />
               <Skeleton className="h-3 w-full" />
@@ -209,12 +216,15 @@ export default function ProjectsPage() {
           ))}
         </div>
       ) : projects.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-32 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
-            <FolderKanban size={28} className="text-muted-foreground" />
+        <div className="flex flex-col items-center justify-center py-32 text-center animate-fade-in">
+          <div className="relative w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-5 ring-1 ring-primary/20">
+            <FolderKanban size={32} className="text-primary/60" />
+            <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
+              <Sparkles size={10} className="text-primary" />
+            </div>
           </div>
-          <h3 className="text-base font-semibold text-foreground mb-1">No projects yet</h3>
-          <p className="text-sm text-muted-foreground max-w-xs">
+          <h3 className="text-base font-semibold text-foreground mb-2">No projects yet</h3>
+          <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
             {isManager
               ? 'Create your first project to organize team work.'
               : "Your manager hasn't created any projects for your team yet."}

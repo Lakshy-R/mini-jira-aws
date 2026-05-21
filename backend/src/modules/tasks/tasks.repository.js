@@ -3,50 +3,102 @@ import {
   PutCommand,
   QueryCommand,
   GetCommand,
-  ScanCommand,
   UpdateCommand,
   DeleteCommand,
 } from '@aws-sdk/lib-dynamodb';
 import { v4 as uuid } from 'uuid';
+import { z } from 'zod';
 
 const TABLE = process.env.DYNAMODB_TASKS_TABLE || 'Tasks';
 
+// ─── Pagination Token Validation ────────────────────────────────────────────
+// DynamoDB LastEvaluatedKey shapes vary by access pattern.
+// We accept any object whose PK (taskId) is a valid UUID.
+const LastKeySchema = z
+  .object({ taskId: z.string().uuid() })
+  .passthrough(); // allow SK and GSI key fields through without listing them all
+
+export const parsePaginationKey = (raw) => {
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(decodeURIComponent(raw));
+    const result = LastKeySchema.safeParse(parsed);
+    if (!result.success) return undefined;
+    return result.data;
+  } catch {
+    return undefined;
+  }
+};
+
+// ─── Repository ─────────────────────────────────────────────────────────────
 export const tasksRepository = {
   async create(data) {
     const task = {
-      taskId: uuid(),
+      taskId:    uuid(),              // repository owns ID generation
+      entity:    'TASK',             // synthetic PK for manager GSI
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      status: 'TODO',
+      status:    'TODO',
       imageVersions: data.imageUrl ? [data.imageUrl] : [],
       ...data,
     };
+    // Ensure entity is never overridden by caller
+    task.entity = 'TASK';
 
     await ddb.send(new PutCommand({ TableName: TABLE, Item: task }));
     return task;
   },
 
-  async getAll({ limit = 100, lastKey } = {}) {
+  /**
+   * Manager all-tasks query — uses entity-createdAt-index GSI.
+   * O(log n) + page-size reads instead of full-table Scan.
+   * Newest first. Paginated.
+   */
+  async queryAll({ limit = 100, lastKey } = {}) {
     const params = {
       TableName: TABLE,
+      IndexName: 'entity-createdAt-index',
+      KeyConditionExpression: '#entity = :entity',
+      ExpressionAttributeNames: { '#entity': 'entity' },
+      ExpressionAttributeValues: { ':entity': 'TASK' },
+      ScanIndexForward: false, // newest first
       Limit: limit,
     };
     if (lastKey) params.ExclusiveStartKey = lastKey;
-
-    return await ddb.send(new ScanCommand(params));
+    return await ddb.send(new QueryCommand(params));
   },
 
+  /**
+   * Employee scoped query — uses teamId-createdAt-index GSI.
+   * Newest first. Paginated.
+   */
   async getByTeam(teamId, { limit = 100, lastKey } = {}) {
     const params = {
       TableName: TABLE,
       IndexName: 'teamId-createdAt-index',
       KeyConditionExpression: 'teamId = :teamId',
       ExpressionAttributeValues: { ':teamId': teamId },
-      ScanIndexForward: false, // newest first
+      ScanIndexForward: false,
       Limit: limit,
     };
     if (lastKey) params.ExclusiveStartKey = lastKey;
+    return await ddb.send(new QueryCommand(params));
+  },
 
+  /**
+   * Assignee query — uses assigneeId-createdAt-index GSI.
+   * Required for the daily-digest Lambda and per-user task views.
+   */
+  async getByAssignee(assigneeId, { limit = 100, lastKey } = {}) {
+    const params = {
+      TableName: TABLE,
+      IndexName: 'assigneeId-createdAt-index',
+      KeyConditionExpression: 'assigneeId = :assigneeId',
+      ExpressionAttributeValues: { ':assigneeId': assigneeId },
+      ScanIndexForward: false,
+      Limit: limit,
+    };
+    if (lastKey) params.ExclusiveStartKey = lastKey;
     return await ddb.send(new QueryCommand(params));
   },
 
@@ -65,7 +117,7 @@ export const tasksRepository = {
         UpdateExpression: 'SET #status = :status, updatedAt = :updatedAt',
         ExpressionAttributeNames: { '#status': 'status' },
         ExpressionAttributeValues: {
-          ':status': status,
+          ':status':    status,
           ':updatedAt': new Date().toISOString(),
         },
         ReturnValues: 'ALL_NEW',
@@ -80,9 +132,7 @@ export const tasksRepository = {
 
     const versions = Array.isArray(existing.imageVersions)
       ? [...existing.imageVersions]
-      : existing.imageUrl
-      ? [existing.imageUrl]
-      : [];
+      : existing.imageUrl ? [existing.imageUrl] : [];
 
     if (existing.imageUrl && existing.imageUrl !== newImageUrl) {
       versions.push(existing.imageUrl);
@@ -94,9 +144,9 @@ export const tasksRepository = {
         Key: { taskId },
         UpdateExpression: 'SET imageUrl = :url, imageVersions = :versions, updatedAt = :now',
         ExpressionAttributeValues: {
-          ':url': newImageUrl,
+          ':url':      newImageUrl,
           ':versions': versions,
-          ':now': new Date().toISOString(),
+          ':now':      new Date().toISOString(),
         },
         ReturnValues: 'ALL_NEW',
       })
@@ -106,11 +156,13 @@ export const tasksRepository = {
 
   async update(taskId, fields) {
     const now = new Date().toISOString();
-    const sets = ['updatedAt = :now'];
-    const names = {};
+    const sets   = ['updatedAt = :now'];
+    const names  = {};
     const values = { ':now': now };
 
-    const allowed = ['title', 'description', 'priority', 'teamId', 'assigneeId', 'projectId', 'deadline'];
+    const allowed = ['title', 'description', 'priority', 'assigneeId', 'projectId', 'deadline'];
+    // NOTE: teamId is intentionally excluded — reassigning a task to another
+    // team requires a dedicated workflow, not a silent field update.
     for (const key of allowed) {
       if (fields[key] !== undefined) {
         sets.push(`#${key} = :${key}`);

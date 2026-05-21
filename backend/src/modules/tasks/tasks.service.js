@@ -1,10 +1,13 @@
 import { tasksRepository } from './tasks.repository.js';
-import { v4 as uuid } from 'uuid';
+import { auditRepository, AUDIT_ACTIONS } from './audit.repository.js';
 import { deleteFromS3, getSignedImageUrl } from '../../lib/s3.js';
 import { publishTaskAssignment } from '../../lib/sns.js';
 import { recordTaskCreated, recordTaskClosed } from '../../lib/cloudwatch.js';
+import { ForbiddenError } from '../../middleware/error.middleware.js';
 
 const VALID_STATUSES = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 const attachPresignedUrl = async (task) => {
   const urlOrKey = task.thumbnailUrl || task.imageUrl;
@@ -18,37 +21,43 @@ const attachPresignedUrl = async (task) => {
 
 const assertTeamAccess = (task, user) => {
   if (user.role === 'manager') return;
-  if (task.teamId !== user.teamId) {
-    const err = new Error('FORBIDDEN');
-    err.code = 'FORBIDDEN';
-    throw err;
-  }
+  if (task.teamId !== user.teamId) throw new ForbiddenError();
 };
 
+// ─── Service ─────────────────────────────────────────────────────────────────
 export const tasksService = {
   async createTask(data, user) {
+    // Repository owns ID generation — no uuid() call here
     const task = await tasksRepository.create({
-      taskId: uuid(),
-      title: data.title,
+      title:       data.title,
       description: data.description || '',
-      status: 'TODO',
-      priority: data.priority || 'MEDIUM',
-      teamId: data.teamId,
-      assigneeId: data.assigneeId,
-      projectId: data.projectId || null,
-      deadline: data.deadline || null,
-      createdBy: user.sub,
-      managerId: user.sub,
-      imageUrl: data.imageUrl || null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      status:      'TODO',
+      priority:    data.priority || 'MEDIUM',
+      teamId:      data.teamId,
+      assigneeId:  data.assigneeId,
+      projectId:   data.projectId || null,
+      deadline:    data.deadline   || null,
+      createdBy:   user.sub,
+      managerId:   user.sub,
+      imageUrl:    data.imageUrl   || null,
     });
 
+    // Fire-and-forget side effects — failures must not block the response
     if (task.assigneeId) {
-      await publishTaskAssignment(task);
+      publishTaskAssignment(task).catch((e) => console.error('[SNS]', e.message));
     }
 
-    recordTaskCreated(task.teamId).catch((err) => console.error('[CW]', err));
+    auditRepository
+      .log({
+        taskId:    task.taskId,
+        action:    AUDIT_ACTIONS.TASK_CREATED,
+        actorId:   user.sub,
+        actorRole: user.role,
+        metadata:  { title: task.title, teamId: task.teamId, assigneeId: task.assigneeId },
+      })
+      .catch((e) => console.error('[AUDIT]', e.message));
+
+    recordTaskCreated(task.teamId).catch((e) => console.error('[CW]', e.message));
 
     return task;
   },
@@ -58,12 +67,13 @@ export const tasksService = {
     if (user?.role !== 'manager' && user?.teamId) {
       result = await tasksRepository.getByTeam(user.teamId, options);
     } else {
-      result = await tasksRepository.getAll(options);
+      // Managers use the entity-createdAt-index GSI — no full table scan
+      result = await tasksRepository.queryAll(options);
     }
 
     const tasks = result.Items || [];
     return {
-      items: await Promise.all(tasks.map(attachPresignedUrl)),
+      items:   await Promise.all(tasks.map(attachPresignedUrl)),
       lastKey: result.LastEvaluatedKey || null,
     };
   },
@@ -80,7 +90,7 @@ export const tasksService = {
   async updateTaskStatus(taskId, status, user) {
     if (!VALID_STATUSES.includes(status)) {
       const err = new Error('INVALID_STATUS');
-      err.code = 'INVALID_STATUS';
+      err.code  = 'INVALID_STATUS';
       throw err;
     }
 
@@ -89,17 +99,28 @@ export const tasksService = {
 
     assertTeamAccess(task, user);
 
+    // Employees can only update status on tasks assigned to them
     if (user.role !== 'manager' && task.assigneeId !== user.sub) {
-      const err = new Error('FORBIDDEN');
-      err.code = 'FORBIDDEN';
-      throw err;
+      throw new ForbiddenError();
     }
 
-    const updated = await tasksRepository.updateStatus(taskId, status);
+    const prevStatus = task.status;
+    const updated    = await tasksRepository.updateStatus(taskId, status);
+
+    // ── Audit log every status transition ──
+    auditRepository
+      .log({
+        taskId,
+        action:    AUDIT_ACTIONS.STATUS_CHANGED,
+        actorId:   user.sub,
+        actorRole: user.role,
+        metadata:  { fromStatus: prevStatus, toStatus: status, teamId: task.teamId },
+      })
+      .catch((e) => console.error('[AUDIT]', e.message));
 
     if (status === 'DONE' && task.createdAt) {
       const timeToCloseMs = Date.now() - new Date(task.createdAt).getTime();
-      recordTaskClosed(task.teamId, timeToCloseMs).catch((err) => console.error('[CW]', err));
+      recordTaskClosed(task.teamId, timeToCloseMs).catch((e) => console.error('[CW]', e.message));
     }
 
     return updated;
@@ -111,7 +132,19 @@ export const tasksService = {
 
     assertTeamAccess(task, user);
 
-    return await tasksRepository.updateImage(taskId, newImageUrl);
+    const updated = await tasksRepository.updateImage(taskId, newImageUrl);
+
+    auditRepository
+      .log({
+        taskId,
+        action:    AUDIT_ACTIONS.IMAGE_UPDATED,
+        actorId:   user.sub,
+        actorRole: user.role,
+        metadata:  { newImageUrl },
+      })
+      .catch((e) => console.error('[AUDIT]', e.message));
+
+    return updated;
   },
 
   async updateTask(taskId, fields, user) {
@@ -120,17 +153,46 @@ export const tasksService = {
 
     assertTeamAccess(task, user);
 
-    return await tasksRepository.update(taskId, fields);
+    const updated = await tasksRepository.update(taskId, fields);
+
+    auditRepository
+      .log({
+        taskId,
+        action:    AUDIT_ACTIONS.TASK_UPDATED,
+        actorId:   user.sub,
+        actorRole: user.role,
+        metadata:  { changedFields: Object.keys(fields) },
+      })
+      .catch((e) => console.error('[AUDIT]', e.message));
+
+    return updated;
   },
 
   async deleteTask(taskId, user) {
     const task = await tasksRepository.getById(taskId);
     if (!task) return false;
 
-    if (task.imageUrl) {
-      await deleteFromS3(task.imageUrl);
-    }
+    // Consistent team-isolation check on every mutation including delete
+    assertTeamAccess(task, user);
 
-    return await tasksRepository.delete(taskId);
+    // Delete original image and its resized thumbnail from S3
+    const deletions = [];
+    if (task.imageUrl)    deletions.push(deleteFromS3(task.imageUrl, process.env.S3_ORIGINALS_BUCKET));
+    if (task.thumbnailUrl) deletions.push(deleteFromS3(task.thumbnailUrl, process.env.S3_RESIZED_BUCKET));
+    await Promise.allSettled(deletions);
+
+    await tasksRepository.delete(taskId);
+
+    auditRepository
+      .log({
+        taskId,
+        action:    AUDIT_ACTIONS.TASK_DELETED,
+        actorId:   user.sub,
+        actorRole: user.role,
+        metadata:  { title: task.title, teamId: task.teamId },
+      })
+      .catch((e) => console.error('[AUDIT]', e.message));
+
+    return true;
   },
 };

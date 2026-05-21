@@ -5,9 +5,9 @@ import { Avatar } from '../ui/avatar';
 import { Badge } from '../ui/badge';
 
 const PRIORITY_CONFIG = {
-  HIGH:   { bar: 'bg-red-500',    badge: 'destructive', dot: 'text-red-500' },
-  MEDIUM: { bar: 'bg-amber-400',  badge: 'warning',     dot: 'text-amber-500' },
-  LOW:    { bar: 'bg-emerald-400',badge: 'success',     dot: 'text-emerald-500' },
+  HIGH:   { bar: 'bg-red-500',    badge: 'destructive' },
+  MEDIUM: { bar: 'bg-amber-500',  badge: 'warning' },
+  LOW:    { bar: 'bg-emerald-500', badge: 'success' },
 };
 
 const DEADLINE_VARIANT = {
@@ -37,10 +37,10 @@ export default function TaskCard({ task, onClick }) {
       ref={setNodeRef}
       style={style}
       className={cn(
-        'group relative bg-card rounded-xl border border-border overflow-hidden',
-        'shadow-[0_1px_3px_0_rgba(0,0,0,0.06)] hover:shadow-[0_4px_12px_0_rgba(0,0,0,0.09)]',
+        'group relative bg-card rounded-xl border border-white/[0.06] overflow-hidden',
+        'hover:border-white/[0.12] hover:shadow-[0_4px_20px_rgba(0,0,0,0.4)]',
         'transition-all duration-150 cursor-pointer select-none',
-        isDragging && 'opacity-60 rotate-1 shadow-lg scale-[1.02]'
+        isDragging && 'border-primary/40 shadow-[0_8px_40px_rgba(109,94,245,0.3)] opacity-90 rotate-1 scale-[1.02]'
       )}
       onClick={() => !isDragging && onClick?.()}
     >
@@ -71,7 +71,7 @@ export default function TaskCard({ task, onClick }) {
           <img
             src={task.presignedUrl}
             alt={task.title}
-            className="w-full h-24 object-cover rounded-lg mb-2.5 pointer-events-none"
+            className="w-full h-24 object-cover rounded-lg mb-2.5 pointer-events-none opacity-90"
             onError={(e) => { e.target.style.display = 'none'; }}
           />
         )}

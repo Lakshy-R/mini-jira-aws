@@ -5,7 +5,7 @@ import { useAuthStore } from '../../store/auth.store';
 import { Avatar } from '../ui/avatar';
 import { Button } from '../ui/button';
 import { Skeleton } from '../ui/skeleton';
-import { formatRelativeTime } from '../../lib/utils';
+import { formatRelativeTime, cn } from '../../lib/utils';
 
 export default function CommentThread({ taskId }) {
   const { user } = useAuthStore();
@@ -95,7 +95,7 @@ export default function CommentThread({ taskId }) {
       </div>
 
       {/* Divider */}
-      <div className="border-t border-border" />
+      <div className="border-t border-white/[0.06]" />
 
       {/* Input */}
       <form onSubmit={handleSubmit} className="flex gap-3">
@@ -107,9 +107,14 @@ export default function CommentThread({ taskId }) {
             onKeyDown={handleKeyDown}
             placeholder="Write a comment… (⌘↵ to send)"
             rows={3}
-            className="w-full rounded-xl border border-border bg-card px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground resize-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:border-transparent transition-shadow"
+            className={cn(
+              'w-full rounded-xl border border-white/[0.08] bg-white/[0.04] px-3 py-2.5',
+              'text-sm text-foreground placeholder:text-muted-foreground resize-none',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:border-primary/50',
+              'transition-all duration-200'
+            )}
           />
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <p className="text-xs text-red-400">{error}</p>}
           <div className="flex justify-end">
             <Button
               type="submit"
@@ -136,12 +141,12 @@ function CommentItem({ comment, currentUserId, isManager, onDelete }) {
     <div className="flex gap-3 group">
       <Avatar name={authorDisplay} size="sm" className="shrink-0" />
       <div className="flex-1 min-w-0">
-        <div className="flex items-baseline justify-between gap-2 mb-1">
+        <div className="flex items-baseline justify-between gap-2 mb-1.5">
           <span className="text-xs font-semibold text-foreground capitalize">{authorDisplay}</span>
           <span className="text-[10px] text-muted-foreground shrink-0">{formatRelativeTime(comment.createdAt)}</span>
         </div>
-        <div className="bg-muted rounded-xl px-3 py-2">
-          <p className="text-sm text-foreground whitespace-pre-wrap break-words">{comment.content}</p>
+        <div className="glass rounded-xl px-3 py-2 border border-white/[0.06]">
+          <p className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">{comment.content}</p>
         </div>
         {canDelete && (
           <div className="mt-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
@@ -150,19 +155,19 @@ function CommentItem({ comment, currentUserId, isManager, onDelete }) {
                 Delete?{' '}
                 <button
                   onClick={() => onDelete(comment.commentId)}
-                  className="text-destructive hover:underline font-medium"
+                  className="text-red-400 hover:underline font-medium"
                 >
                   Yes
                 </button>
                 {' · '}
-                <button onClick={() => setConfirmDelete(false)} className="hover:underline">
+                <button onClick={() => setConfirmDelete(false)} className="hover:underline text-muted-foreground hover:text-foreground">
                   Cancel
                 </button>
               </span>
             ) : (
               <button
                 onClick={() => setConfirmDelete(true)}
-                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
+                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-red-400 transition-colors"
               >
                 <Trash2 size={11} />
                 Delete

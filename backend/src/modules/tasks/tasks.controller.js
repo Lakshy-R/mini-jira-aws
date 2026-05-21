@@ -1,7 +1,9 @@
 import { tasksService } from './tasks.service.js';
 import { tasksRepository } from './tasks.repository.js';
+import { auditRepository } from './audit.repository.js';
 import { getSignedImageUrl } from '../../lib/s3.js';
-import { asyncHandler, NotFoundError, ValidationError } from '../../middleware/error.middleware.js';
+import { asyncHandler, NotFoundError, ValidationError, ForbiddenError } from '../../middleware/error.middleware.js';
+import { parsePaginationKey } from './tasks.repository.js';
 
 export const tasksController = {
   create: asyncHandler(async (req, res) => {
@@ -12,8 +14,8 @@ export const tasksController = {
   getAll: asyncHandler(async (req, res) => {
     const { lastKey, limit } = req.query;
     const options = {
-      limit: Math.min(parseInt(limit) || 100, 200),
-      lastKey: lastKey ? JSON.parse(decodeURIComponent(lastKey)) : undefined,
+      limit:   Math.min(parseInt(limit) || 100, 200),
+      lastKey: parsePaginationKey(lastKey),
     };
     const result = await tasksService.getTasks(req.user, options);
     res.json(result);
@@ -54,14 +56,22 @@ export const tasksController = {
   getImageUrl: asyncHandler(async (req, res) => {
     const task = await tasksRepository.getById(req.params.id);
     if (!task) throw new NotFoundError('Task');
-    if (!task.imageUrl && !task.thumbnailUrl) {
-      throw new NotFoundError('Task image');
-    }
+    if (req.user.role !== 'manager' && task.teamId !== req.user.teamId) throw new ForbiddenError();
+    if (!task.imageUrl && !task.thumbnailUrl) throw new NotFoundError('Task image');
+
     const urlOrKey = task.thumbnailUrl || task.imageUrl;
-    const bucket = task.thumbnailUrl
-      ? process.env.S3_RESIZED_BUCKET
-      : process.env.S3_ORIGINALS_BUCKET;
-    const url = await getSignedImageUrl(urlOrKey, bucket);
+    const bucket   = task.thumbnailUrl ? process.env.S3_RESIZED_BUCKET : process.env.S3_ORIGINALS_BUCKET;
+    const url      = await getSignedImageUrl(urlOrKey, bucket);
     res.json({ url });
+  }),
+
+  // GET /api/tasks/:id/history — returns full audit trail for a task
+  getHistory: asyncHandler(async (req, res) => {
+    const task = await tasksRepository.getById(req.params.id);
+    if (!task) throw new NotFoundError('Task');
+    if (req.user.role !== 'manager' && task.teamId !== req.user.teamId) throw new ForbiddenError();
+
+    const history = await auditRepository.getByTaskId(req.params.id);
+    res.json(history);
   }),
 };

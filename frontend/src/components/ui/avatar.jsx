@@ -17,7 +17,7 @@ export function Avatar({ name = '', size = 'md', src, className }) {
       <img
         src={src}
         alt={name}
-        className={cn('rounded-full object-cover ring-1 ring-border shrink-0', sizes[size], className)}
+        className={cn('rounded-full object-cover ring-1 ring-white/10 shrink-0', sizes[size], className)}
       />
     );
   }
@@ -25,7 +25,7 @@ export function Avatar({ name = '', size = 'md', src, className }) {
   return (
     <div
       className={cn(
-        'rounded-full flex items-center justify-center font-semibold shrink-0 ring-1 ring-inset ring-black/5',
+        'rounded-full flex items-center justify-center font-semibold shrink-0 ring-1 ring-inset',
         sizes[size],
         color,
         className

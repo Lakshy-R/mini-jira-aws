@@ -13,10 +13,10 @@ import api from '../../services/api';
 const STATUSES = ['TODO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
 
 const STATUS_CONFIG = {
-  TODO:        { label: 'To Do',       variant: 'secondary' },
-  IN_PROGRESS: { label: 'In Progress', variant: 'info' },
-  IN_REVIEW:   { label: 'In Review',   variant: 'warning' },
-  DONE:        { label: 'Done',        variant: 'success' },
+  TODO:        { label: 'To Do',       variant: 'secondary',    active: 'border-slate-500/50 bg-slate-500/10 text-slate-300',    hover: 'hover:border-slate-500/40 hover:text-slate-300' },
+  IN_PROGRESS: { label: 'In Progress', variant: 'info',         active: 'border-blue-500/50 bg-blue-500/10 text-blue-300',       hover: 'hover:border-blue-500/40 hover:text-blue-300' },
+  IN_REVIEW:   { label: 'In Review',   variant: 'warning',      active: 'border-amber-500/50 bg-amber-500/10 text-amber-300',    hover: 'hover:border-amber-500/40 hover:text-amber-300' },
+  DONE:        { label: 'Done',        variant: 'success',      active: 'border-emerald-500/50 bg-emerald-500/10 text-emerald-300', hover: 'hover:border-emerald-500/40 hover:text-emerald-300' },
 };
 
 const PRIORITY_CONFIG = {
@@ -106,14 +106,14 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-end bg-black/40 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-start justify-end bg-black/60 backdrop-blur-sm"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       {/* Slide-in panel */}
-      <div className="h-full w-full max-w-xl bg-card shadow-[−20px_0_60px_rgba(0,0,0,0.15)] flex flex-col animate-slide-in-right overflow-y-auto">
+      <div className="h-full w-full max-w-xl bg-[#0f1629]/95 backdrop-blur-xl border-l border-white/[0.06] shadow-[-20px_0_60px_rgba(0,0,0,0.5)] flex flex-col animate-slide-in-right overflow-y-auto">
 
         {/* Header */}
-        <div className="sticky top-0 bg-card z-10 px-6 py-4 border-b border-border flex items-start justify-between gap-4">
+        <div className="sticky top-0 bg-[#0f1629]/95 backdrop-blur-xl z-10 px-6 py-4 border-b border-white/[0.06] flex items-start justify-between gap-4">
           <div className="flex-1 min-w-0 space-y-2">
             <div className="flex items-center flex-wrap gap-1.5">
               {currentTask.priority && (
@@ -137,7 +137,7 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
+            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors shrink-0"
             aria-label="Close panel"
           >
             <X size={16} />
@@ -148,21 +148,21 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
 
           {/* Image */}
           {(presignedImageUrl || currentTask.imageUrl) && (
-            <div className="relative rounded-xl overflow-hidden bg-muted group">
+            <div className="relative rounded-xl overflow-hidden bg-white/[0.04] group">
               {presignedImageUrl ? (
                 <img
                   src={presignedImageUrl}
                   alt="Task attachment"
-                  className="w-full max-h-52 object-cover"
+                  className="w-full max-h-52 object-cover opacity-90"
                 />
               ) : (
                 <div className="w-full h-32 flex items-center justify-center text-muted-foreground text-sm">
                   Loading image…
                 </div>
               )}
-              <label className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/50 transition-colors cursor-pointer">
-                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 bg-black/60 text-white text-sm font-medium px-3 py-1.5 rounded-lg">
-                  <ImagePlus size={14} />
+              <label className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/60 transition-colors cursor-pointer">
+                <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-2 glass-strong text-foreground text-sm font-medium px-3 py-1.5 rounded-lg">
+                  <ImagePlus size={14} className="text-primary" />
                   {imageUploading ? 'Uploading…' : 'Replace image'}
                 </div>
                 <input
@@ -185,20 +185,20 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
           )}
 
           {/* Meta grid */}
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-1">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="glass rounded-xl p-3 space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                 <Users size={11} />
                 Assignee
               </div>
               <div className="flex items-center gap-2">
                 <Avatar name={assigneeDisplay} size="sm" />
-                <span className="text-sm text-foreground capitalize">{assigneeDisplay}</span>
+                <span className="text-sm text-foreground capitalize truncate">{assigneeDisplay}</span>
               </div>
             </div>
 
             {currentTask.deadline && (
-              <div className="space-y-1">
+              <div className="glass rounded-xl p-3 space-y-1.5">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   <Calendar size={11} />
                   Deadline
@@ -218,7 +218,7 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
             )}
 
             {currentTask.teamId && (
-              <div className="space-y-1">
+              <div className="glass rounded-xl p-3 space-y-1.5">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                   <Tag size={11} />
                   Team
@@ -243,8 +243,8 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
                     className={cn(
                       'px-3 py-2 rounded-lg text-xs font-medium border transition-all duration-150',
                       isActive
-                        ? 'border-primary bg-primary/10 text-primary ring-1 ring-primary/30'
-                        : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground bg-card',
+                        ? cfg.active
+                        : cn('border-white/[0.06] text-muted-foreground bg-white/[0.02]', cfg.hover),
                       !canChangeStatus && 'cursor-not-allowed opacity-40'
                     )}
                   >
@@ -266,18 +266,18 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
 
           {/* Danger zone */}
           {isManager && (
-            <div className="border-t border-destructive/20 pt-4">
+            <div className="border-t border-white/[0.06] pt-4">
               {!confirmDelete ? (
                 <button
                   onClick={() => setConfirmDelete(true)}
-                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-destructive transition-colors"
+                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-red-400 transition-colors group"
                 >
-                  <Trash2 size={14} />
+                  <Trash2 size={14} className="group-hover:text-red-400 transition-colors" />
                   Delete task
                 </button>
               ) : (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                  <p className="text-sm font-medium text-destructive mb-3">This action cannot be undone.</p>
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4">
+                  <p className="text-sm font-medium text-red-400 mb-3">This action cannot be undone.</p>
                   <div className="flex items-center gap-2">
                     <Button variant="destructive" size="sm" onClick={handleDelete} disabled={deleting}>
                       {deleting ? 'Deleting…' : 'Yes, delete task'}

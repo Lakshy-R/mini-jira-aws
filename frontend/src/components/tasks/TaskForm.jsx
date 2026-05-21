@@ -5,7 +5,6 @@ import { projectsService } from '../../services/projects.service';
 import { toast } from '../../store/toast.store';
 import { Button } from '../ui/button';
 import { Input, Textarea, Select, FormField } from '../ui/input';
-import { Badge } from '../ui/badge';
 import {
   Dialog,
   DialogTrigger,
@@ -18,9 +17,24 @@ import {
 import { cn } from '../../lib/utils';
 
 const PRIORITIES = [
-  { value: 'LOW',    label: 'Low',    className: 'border-emerald-200 text-emerald-700 data-[active]:bg-emerald-50 data-[active]:ring-emerald-300' },
-  { value: 'MEDIUM', label: 'Medium', className: 'border-amber-200   text-amber-700   data-[active]:bg-amber-50   data-[active]:ring-amber-300' },
-  { value: 'HIGH',   label: 'High',   className: 'border-red-200     text-red-700     data-[active]:bg-red-50     data-[active]:ring-red-300' },
+  {
+    value: 'LOW',
+    label: 'Low',
+    activeClass: 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300 shadow-[0_0_12px_rgba(52,211,153,0.2)]',
+    inactiveClass: 'border-white/[0.08] text-muted-foreground hover:border-emerald-500/30 hover:text-emerald-300',
+  },
+  {
+    value: 'MEDIUM',
+    label: 'Medium',
+    activeClass: 'border-amber-500/50 bg-amber-500/15 text-amber-300 shadow-[0_0_12px_rgba(251,191,36,0.2)]',
+    inactiveClass: 'border-white/[0.08] text-muted-foreground hover:border-amber-500/30 hover:text-amber-300',
+  },
+  {
+    value: 'HIGH',
+    label: 'High',
+    activeClass: 'border-red-500/50 bg-red-500/15 text-red-300 shadow-[0_0_12px_rgba(239,68,68,0.2)]',
+    inactiveClass: 'border-white/[0.08] text-muted-foreground hover:border-red-500/30 hover:text-red-300',
+  },
 ];
 
 const initialForm = {
@@ -136,14 +150,10 @@ export default function TaskForm({ onTaskCreated }) {
                   <button
                     key={p.value}
                     type="button"
-                    data-active={form.priority === p.value ? '' : undefined}
                     onClick={() => setForm((f) => ({ ...f, priority: p.value }))}
                     className={cn(
-                      'flex-1 text-xs font-semibold py-1.5 rounded-lg border transition-all ring-1 ring-inset ring-transparent',
-                      p.className,
-                      form.priority === p.value
-                        ? 'ring-2 ring-current/40 shadow-sm'
-                        : 'border-border text-muted-foreground hover:border-current/50 bg-card'
+                      'flex-1 text-xs font-semibold py-2 rounded-lg border transition-all duration-150',
+                      form.priority === p.value ? p.activeClass : p.inactiveClass
                     )}
                   >
                     {p.label}
@@ -208,10 +218,18 @@ export default function TaskForm({ onTaskCreated }) {
 
             {/* Image upload */}
             <FormField label="Attachment">
-              <label className="flex items-center gap-3 w-full border-2 border-dashed border-border hover:border-primary/50 rounded-xl px-4 py-3 cursor-pointer transition-colors group">
-                <Upload size={15} className="text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+              <label className={cn(
+                'flex items-center gap-3 w-full border-2 border-dashed rounded-xl px-4 py-3 cursor-pointer transition-all group',
+                imageFile
+                  ? 'border-primary/40 bg-primary/5'
+                  : 'border-white/[0.08] hover:border-primary/40 hover:bg-primary/5'
+              )}>
+                <Upload size={15} className={cn(
+                  'shrink-0 transition-colors',
+                  imageFile ? 'text-primary' : 'text-muted-foreground group-hover:text-primary'
+                )} />
                 <span className={cn(
-                  'text-sm truncate transition-colors',
+                  'text-sm truncate transition-colors flex-1',
                   imageFile ? 'text-foreground font-medium' : 'text-muted-foreground group-hover:text-foreground'
                 )}>
                   {imageFile ? imageFile.name : 'Upload image (optional)'}
@@ -220,7 +238,7 @@ export default function TaskForm({ onTaskCreated }) {
                   <button
                     type="button"
                     onClick={(e) => { e.preventDefault(); e.stopPropagation(); setImageFile(null); }}
-                    className="ml-auto text-muted-foreground hover:text-destructive transition-colors"
+                    className="ml-auto text-muted-foreground hover:text-red-400 transition-colors"
                   >
                     <X size={14} />
                   </button>

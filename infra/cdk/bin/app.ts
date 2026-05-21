@@ -1,0 +1,14 @@
+#!/usr/bin/env node
+import 'source-map-support/register';
+import * as cdk from 'aws-cdk-lib';
+import { MiniJiraStack } from '../lib/mini-jira-stack';
+
+const app = new cdk.App();
+
+new MiniJiraStack(app, 'MiniJiraStack', {
+  env: {
+    account: process.env.CDK_DEFAULT_ACCOUNT,
+    region:  process.env.CDK_DEFAULT_REGION || 'eu-north-1',
+  },
+  description: 'Mini-Jira on AWS — VPC, ALB, ASG, CloudFront, DynamoDB',
+});

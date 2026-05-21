@@ -13,27 +13,45 @@ const mapUser = (cognitoUser) => {
 
   return {
     userId: cognitoUser.Username,
-    email: attr('email'),
-    name: attr('name') || attr('email'),
-    role: attr('custom:role'),
+    email:  attr('email'),
+    name:   attr('name') || attr('email'),
+    role:   attr('custom:role'),
     teamId: attr('custom:teamId'),
     status: cognitoUser.UserStatus,
   };
 };
 
+/**
+ * Paginates through ALL Cognito users — no hard 60-user cap.
+ * Cognito's max per-page is 60; this loop collects all pages.
+ */
+const listAllUsers = async () => {
+  const users      = [];
+  let paginationToken;
+
+  do {
+    const command = new ListUsersCommand({
+      UserPoolId:      process.env.COGNITO_USER_POOL_ID,
+      Limit:           60,
+      PaginationToken: paginationToken,
+    });
+
+    const result   = await cognitoClient.send(command);
+    const page     = (result.Users || []).map(mapUser);
+    users.push(...page);
+    paginationToken = result.PaginationToken;
+  } while (paginationToken);
+
+  return users;
+};
+
 export const usersService = {
   async listUsers() {
-    const result = await cognitoClient.send(
-      new ListUsersCommand({
-        UserPoolId: process.env.COGNITO_USER_POOL_ID,
-        Limit: 60,
-      })
-    );
-    return (result.Users || []).map(mapUser);
+    return listAllUsers();
   },
 
   async listTeams() {
-    const users = await this.listUsers();
+    const users   = await listAllUsers();
     const teamMap = {};
     for (const u of users) {
       if (u.teamId && !teamMap[u.teamId]) {
@@ -44,7 +62,7 @@ export const usersService = {
   },
 
   async listEmployees() {
-    const users = await this.listUsers();
+    const users = await listAllUsers();
     return users.filter((u) => u.role === 'employee');
   },
 };

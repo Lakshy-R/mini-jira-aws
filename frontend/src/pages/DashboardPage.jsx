@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { LayoutGrid, Filter, X } from 'lucide-react';
+import { LayoutGrid, Filter, X, Sparkles } from 'lucide-react';
 import { useTasks, useCreateTask } from '../hooks/useTasks';
 import { usersService } from '../services/users.service';
 import { useQuery } from '@tanstack/react-query';
@@ -13,9 +13,26 @@ import { Button } from '../components/ui/button';
 import { Skeleton } from '../components/ui/skeleton';
 import { cn } from '../lib/utils';
 
+const STAT_CONFIG = [
+  { status: 'TODO',        label: 'To Do',       color: 'text-slate-400',   bg: 'bg-slate-500/10',   ring: 'ring-slate-500/20',   dot: 'bg-slate-400' },
+  { status: 'IN_PROGRESS', label: 'In Progress',  color: 'text-blue-400',    bg: 'bg-blue-500/10',    ring: 'ring-blue-500/20',    dot: 'bg-blue-400' },
+  { status: 'IN_REVIEW',   label: 'In Review',    color: 'text-amber-400',   bg: 'bg-amber-500/10',   ring: 'ring-amber-500/20',   dot: 'bg-amber-400' },
+  { status: 'DONE',        label: 'Done',         color: 'text-emerald-400', bg: 'bg-emerald-500/10', ring: 'ring-emerald-500/20', dot: 'bg-emerald-400' },
+];
+
+function StatChip({ label, count, color, bg, ring, dot }) {
+  return (
+    <div className={cn('flex items-center gap-2 px-3 py-1.5 rounded-lg ring-1 ring-inset', bg, ring)}>
+      <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', dot)} />
+      <span className={cn('text-xs font-semibold', color)}>{count}</span>
+      <span className="text-xs text-muted-foreground">{label}</span>
+    </div>
+  );
+}
+
 function PageSkeleton() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 animate-pulse">
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
       {[0, 1, 2, 3].map((col) => (
         <div key={col} className="space-y-3">
           <div className="flex items-center gap-2 mb-3">
@@ -23,9 +40,9 @@ function PageSkeleton() {
             <Skeleton className="h-3 w-20" />
             <Skeleton className="h-5 w-6 rounded-full ml-auto" />
           </div>
-          <div className="rounded-xl border-2 border-t-4 border-border p-2 min-h-[400px] space-y-2">
+          <div className="rounded-xl border border-white/[0.05] bg-white/[0.02] p-2 min-h-[400px] space-y-2">
             {[0, 1, 2].map((card) => (
-              <div key={card} className="bg-card rounded-xl border border-border p-4 space-y-3">
+              <div key={card} className="bg-card rounded-xl border border-white/[0.06] p-4 space-y-3">
                 <Skeleton className="h-4 w-3/4" />
                 <Skeleton className="h-3 w-full" />
                 <Skeleton className="h-3 w-1/2" />
@@ -44,12 +61,15 @@ function PageSkeleton() {
 
 function EmptyState({ isManager }) {
   return (
-    <div className="flex flex-col items-center justify-center py-32 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mb-4">
-        <LayoutGrid size={28} className="text-muted-foreground" />
+    <div className="flex flex-col items-center justify-center py-32 text-center animate-fade-in">
+      <div className="relative w-20 h-20 rounded-2xl bg-primary/10 flex items-center justify-center mb-5 ring-1 ring-primary/20">
+        <LayoutGrid size={32} className="text-primary/60" />
+        <div className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-primary/20 flex items-center justify-center">
+          <Sparkles size={10} className="text-primary" />
+        </div>
       </div>
-      <h3 className="text-base font-semibold text-foreground mb-1">No tasks yet</h3>
-      <p className="text-sm text-muted-foreground max-w-xs">
+      <h3 className="text-base font-semibold text-foreground mb-2">No tasks yet</h3>
+      <p className="text-sm text-muted-foreground max-w-xs leading-relaxed">
         {isManager
           ? 'Create your first task to get the board started.'
           : "Your manager hasn't assigned any tasks yet. Check back soon."}
@@ -92,10 +112,15 @@ export default function DashboardPage() {
     ? tasks.filter((t) => t.teamId === teamFilter)
     : tasks;
 
+  const stats = STAT_CONFIG.map((s) => ({
+    ...s,
+    count: tasks.filter((t) => t.status === s.status).length,
+  }));
+
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground tracking-tight">Board</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
@@ -105,7 +130,7 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           {/* Manager team filter */}
           {isManager && teams.length > 0 && (
             <div className="flex items-center gap-2">
@@ -113,7 +138,7 @@ export default function DashboardPage() {
               <Select
                 value={teamFilter}
                 onChange={(e) => setTeamFilter(e.target.value)}
-                className="h-8 text-xs pr-8 w-auto"
+                className="h-8 text-xs pr-8 w-auto min-w-[120px]"
               >
                 <option value="">All teams</option>
                 {teams.map((t) => (
@@ -134,6 +159,15 @@ export default function DashboardPage() {
           {isManager && <TaskForm onTaskCreated={handleCreateTask} />}
         </div>
       </div>
+
+      {/* Stats bar */}
+      {!isLoading && tasks.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap animate-slide-down">
+          {stats.map((s) => (
+            <StatChip key={s.status} {...s} />
+          ))}
+        </div>
+      )}
 
       {/* Board content */}
       {isLoading ? (

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 
 import LandingPage   from '../pages/LandingPage';
 import LoginPage     from '../pages/LoginPage';
+import SignupPage    from '../pages/SignupPage';
 import DashboardPage from '../pages/DashboardPage';
 import ProjectsPage  from '../pages/ProjectsPage';
 import AppLayout     from '../components/layout/AppLayout';
@@ -19,7 +20,8 @@ export default function AppRouter() {
       <Routes>
         {/* Public */}
         <Route path="/"      element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/login"  element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
 
         {/* Protected */}
         <Route path="/dashboard" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />

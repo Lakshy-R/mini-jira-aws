@@ -3,6 +3,8 @@
 A lightweight team task-management web app (like a stripped-down Jira/Trello) fully running on AWS. Supports multiple teams, manager-to-employee task assignment, event-driven notifications, a Lambda image pipeline, and CloudWatch monitoring.
 
 ---
+## Demo Video
+https://drive.google.com/drive/folders/1TfHhhN4RzUf6NBqF6wgGfrxZgt81R7a3?usp=sharing
 
 ## Table of Contents
 

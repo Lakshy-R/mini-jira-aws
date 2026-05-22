@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react';
-import { X, Calendar, Users, Tag, Trash2, ImagePlus, AlertTriangle } from 'lucide-react';
+import { X, Calendar, Users, Tag, Trash2, ImagePlus, AlertTriangle, Pencil, Check } from 'lucide-react';
 import { tasksService, updateTaskImage } from '../../services/tasks.service';
+import { usersService } from '../../services/users.service';
 import { useAuthStore } from '../../store/auth.store';
 import { toast } from '../../store/toast.store';
 import { cn, formatDeadline } from '../../lib/utils';
 import { Avatar } from '../ui/avatar';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
+import { Input, Textarea, Select } from '../ui/input';
 import CommentThread from './CommentThread';
 import api from '../../services/api';
 
@@ -30,6 +32,107 @@ function isOverdue(deadline, status) {
   return new Date(deadline) < new Date();
 }
 
+function EditForm({ task, onSave, onCancel }) {
+  const [form, setForm] = useState({
+    title:      task.title || '',
+    description: task.description || '',
+    priority:   task.priority || 'MEDIUM',
+    assigneeId: task.assigneeId || '',
+    deadline:   task.deadline ? task.deadline.split('T')[0] : '',
+  });
+  const [employees, setEmployees] = useState([]);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    usersService.getEmployees().then(setEmployees).catch(() => []);
+  }, []);
+
+  const teamEmployees = task.teamId
+    ? employees.filter((e) => e.teamId === task.teamId)
+    : employees;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.title.trim()) { toast.error('Title is required'); return; }
+    setSaving(true);
+    try {
+      await onSave({
+        title:       form.title.trim(),
+        description: form.description.trim(),
+        priority:    form.priority,
+        assigneeId:  form.assigneeId || undefined,
+        deadline:    form.deadline || undefined,
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4 animate-slide-down">
+      <div className="space-y-1.5">
+        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Title</label>
+        <Input
+          value={form.title}
+          onChange={(e) => setForm({ ...form, title: e.target.value })}
+          autoFocus
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Description</label>
+        <Textarea
+          value={form.description}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          rows={3}
+        />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Priority</label>
+          <Select value={form.priority} onChange={(e) => setForm({ ...form, priority: e.target.value })}>
+            <option value="LOW">Low</option>
+            <option value="MEDIUM">Medium</option>
+            <option value="HIGH">High</option>
+          </Select>
+        </div>
+
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Deadline</label>
+          <Input
+            type="date"
+            value={form.deadline}
+            onChange={(e) => setForm({ ...form, deadline: e.target.value })}
+          />
+        </div>
+      </div>
+
+      {teamEmployees.length > 0 && (
+        <div className="space-y-1.5">
+          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Assignee</label>
+          <Select value={form.assigneeId} onChange={(e) => setForm({ ...form, assigneeId: e.target.value })}>
+            <option value="">Unassigned</option>
+            {teamEmployees.map((emp) => (
+              <option key={emp.userId} value={emp.userId}>{emp.name || emp.email}</option>
+            ))}
+          </Select>
+        </div>
+      )}
+
+      <div className="flex items-center gap-2 pt-1">
+        <Button type="submit" size="sm" disabled={saving}>
+          <Check size={13} className="mr-1" />
+          {saving ? 'Saving…' : 'Save changes'}
+        </Button>
+        <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted }) {
   const { user } = useAuthStore();
   const [currentTask, setCurrentTask] = useState(task);
@@ -37,6 +140,7 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
   const [imageUploading, setImageUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [presignedImageUrl, setPresignedImageUrl] = useState(task.presignedUrl || null);
 
   const isManager = user?.role === 'manager';
@@ -75,6 +179,19 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
     }
   };
 
+  const handleEditSave = async (fields) => {
+    try {
+      const updated = await tasksService.updateTask(currentTask.taskId, fields);
+      const newTask = { ...currentTask, ...fields, ...updated };
+      setCurrentTask(newTask);
+      onUpdated?.(newTask);
+      setEditing(false);
+      toast.success('Task updated');
+    } catch (err) {
+      toast.error(err.displayMessage || 'Failed to update task');
+    }
+  };
+
   const handleImageChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -109,7 +226,6 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
       className="fixed inset-0 z-50 flex items-start justify-end bg-black/60 backdrop-blur-sm"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
-      {/* Slide-in panel */}
       <div className="h-full w-full max-w-xl bg-[#0f1629]/95 backdrop-blur-xl border-l border-white/[0.06] shadow-[-20px_0_60px_rgba(0,0,0,0.5)] flex flex-col animate-slide-in-right overflow-y-auto">
 
         {/* Header */}
@@ -135,16 +251,39 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
               {currentTask.title}
             </h2>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors shrink-0"
-            aria-label="Close panel"
-          >
-            <X size={16} />
-          </button>
+          <div className="flex items-center gap-1 shrink-0">
+            {isManager && !editing && (
+              <button
+                onClick={() => setEditing(true)}
+                className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors"
+                aria-label="Edit task"
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-white/[0.06] transition-colors"
+              aria-label="Close panel"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 px-6 py-5 space-y-6">
+
+          {/* Edit form — manager only */}
+          {editing && (
+            <div className="bg-white/[0.03] border border-white/[0.08] rounded-xl p-4">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-4">Edit Task</p>
+              <EditForm
+                task={currentTask}
+                onSave={handleEditSave}
+                onCancel={() => setEditing(false)}
+              />
+            </div>
+          )}
 
           {/* Image */}
           {(presignedImageUrl || currentTask.imageUrl) && (
@@ -177,7 +316,7 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
           )}
 
           {/* Description */}
-          {currentTask.description && (
+          {!editing && currentTask.description && (
             <div>
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">Description</p>
               <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">{currentTask.description}</p>
@@ -185,48 +324,50 @@ export default function TaskDetailModal({ task, onClose, onUpdated, onDeleted })
           )}
 
           {/* Meta grid */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="glass rounded-xl p-3 space-y-1.5">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                <Users size={11} />
-                Assignee
-              </div>
-              <div className="flex items-center gap-2">
-                <Avatar name={assigneeDisplay} size="sm" />
-                <span className="text-sm text-foreground capitalize truncate">{assigneeDisplay}</span>
-              </div>
-            </div>
-
-            {currentTask.deadline && (
+          {!editing && (
+            <div className="grid grid-cols-2 gap-3">
               <div className="glass rounded-xl p-3 space-y-1.5">
                 <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  <Calendar size={11} />
-                  Deadline
+                  <Users size={11} />
+                  Assignee
                 </div>
                 <div className="flex items-center gap-2">
-                  {deadline && (
-                    <Badge
-                      variant={overdue ? 'destructive' : deadline.variant === 'today' ? 'warning' : 'secondary'}
-                    >
-                      {new Date(currentTask.deadline).toLocaleDateString(undefined, {
-                        year: 'numeric', month: 'short', day: 'numeric',
-                      })}
-                    </Badge>
-                  )}
+                  <Avatar name={assigneeDisplay} size="sm" />
+                  <span className="text-sm text-foreground capitalize truncate">{assigneeDisplay}</span>
                 </div>
               </div>
-            )}
 
-            {currentTask.teamId && (
-              <div className="glass rounded-xl p-3 space-y-1.5">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                  <Tag size={11} />
-                  Team
+              {currentTask.deadline && (
+                <div className="glass rounded-xl p-3 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    <Calendar size={11} />
+                    Deadline
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {deadline && (
+                      <Badge
+                        variant={overdue ? 'destructive' : deadline.variant === 'today' ? 'warning' : 'secondary'}
+                      >
+                        {new Date(currentTask.deadline).toLocaleDateString(undefined, {
+                          year: 'numeric', month: 'short', day: 'numeric',
+                        })}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
-                <span className="text-sm text-foreground">{currentTask.teamId}</span>
-              </div>
-            )}
-          </div>
+              )}
+
+              {currentTask.teamId && (
+                <div className="glass rounded-xl p-3 space-y-1.5">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    <Tag size={11} />
+                    Team
+                  </div>
+                  <span className="text-sm text-foreground">{currentTask.teamId}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Status selector */}
           <div>

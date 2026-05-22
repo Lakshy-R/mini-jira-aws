@@ -2,6 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 import tasksRouter from './modules/tasks/tasks.router.js';
 import projectsRouter from './modules/projects/projects.router.js';
@@ -62,6 +66,13 @@ app.use('/api/users', usersRouter);
 
 // Multer file errors (must come before global handler)
 app.use(multerErrorHandler);
+
+// Serve React frontend — must come after all API routes
+const DIST = path.resolve(__dirname, '../../frontend/dist');
+app.use(express.static(DIST));
+app.get('*', (_req, res) => {
+  res.sendFile(path.join(DIST, 'index.html'));
+});
 
 // Global error handler
 app.use(errorHandler);

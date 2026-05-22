@@ -574,7 +574,6 @@ Go to: **Lambda → Create function → Author from scratch**
 | Key | Value |
 |---|---|
 | `S3_RESIZED_BUCKET` | `mini-jira-resized-YOURNAME-2026` |
-| `AWS_REGION` | `eu-north-1` |
 | `DYNAMODB_TASKS_TABLE` | `Tasks` |
 
 **General configuration**: Timeout → `0 min 30 sec`
@@ -605,7 +604,6 @@ Upload `assignment-worker.zip`.
 | Key | Value |
 |---|---|
 | `DYNAMODB_ACTIVITY_LOGS_TABLE` | `ActivityLogs` |
-| `AWS_REGION` | `eu-north-1` |
 
 **SQS trigger** (Configuration tab → Triggers → Add trigger):
 - Source: **SQS**
@@ -633,7 +631,6 @@ Upload `daily-digest.zip`.
 |---|---|
 | `DYNAMODB_TASKS_TABLE` | `Tasks` |
 | `SNS_DIGEST_TOPIC_ARN` | *(DailyDigestTopic ARN from step 7b)* |
-| `AWS_REGION` | `eu-north-1` |
 | `ENV` | `production` |
 
 **General configuration**: Timeout → `1 min 0 sec`

@@ -22,7 +22,7 @@ export const handler = async (event) => {
 
       // 1. Write to ActivityLogs DynamoDB table
       await docClient.send(new PutCommand({
-        TableName: 'ActivityLogs',
+        TableName: process.env.DYNAMODB_ACTIVITY_LOGS_TABLE || 'ActivityLogs',
         Item: {
           logId: logId,
           taskId: taskData.taskId,

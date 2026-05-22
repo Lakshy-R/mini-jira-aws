@@ -486,6 +486,7 @@ export class MiniJiraStack extends cdk.Stack {
       memorySize:   256,
       environment: {
         DYNAMODB_ACTIVITY_LOGS_TABLE: 'ActivityLogs',
+        CW_NAMESPACE:                 'MiniJira',
       },
       logRetention: logs.RetentionDays.ONE_MONTH,
     });
@@ -539,6 +540,7 @@ export class MiniJiraStack extends cdk.Stack {
         DYNAMODB_TASKS_TABLE:  'Tasks',
         SNS_DIGEST_TOPIC_ARN:  digestTopic.topicArn,
         ENV:                   'production',
+        CW_NAMESPACE:          'MiniJira',
       },
       logRetention: logs.RetentionDays.ONE_MONTH,
     });

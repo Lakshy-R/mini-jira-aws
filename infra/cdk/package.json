@@ -1,0 +1,24 @@
+{
+  "name": "mini-jira-cdk",
+  "version": "1.0.0",
+  "description": "AWS CDK infrastructure for Mini-Jira",
+  "main": "bin/app.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc -w",
+    "cdk": "cdk",
+    "deploy": "cdk deploy --all --require-approval never",
+    "diff": "cdk diff",
+    "synth": "cdk synth"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.21",
+    "@types/source-map-support": "^0.5.10",
+    "source-map-support": "^0.5.21",
+    "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "^2.200.0",
+    "constructs": "^10.4.2"
+  }
+}

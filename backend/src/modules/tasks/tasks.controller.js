@@ -1,134 +1,77 @@
 import { tasksService } from './tasks.service.js';
 import { tasksRepository } from './tasks.repository.js';
+import { auditRepository } from './audit.repository.js';
 import { getSignedImageUrl } from '../../lib/s3.js';
+import { asyncHandler, NotFoundError, ValidationError, ForbiddenError } from '../../middleware/error.middleware.js';
+import { parsePaginationKey } from './tasks.repository.js';
 
 export const tasksController = {
-    async create(req, res) {
-        try {
-            const task = await tasksService.createTask(
-                req.body,
-                req.user
-            );
+  create: asyncHandler(async (req, res) => {
+    const task = await tasksService.createTask(req.body, req.user);
+    res.status(201).json(task);
+  }),
 
-            res.status(201).json(task);
-        } catch (err) {
-            console.error(err);
+  getAll: asyncHandler(async (req, res) => {
+    const { lastKey, limit } = req.query;
+    const options = {
+      limit:   Math.min(parseInt(limit) || 100, 200),
+      lastKey: parsePaginationKey(lastKey),
+    };
+    const result = await tasksService.getTasks(req.user, options);
+    res.json(result);
+  }),
 
-            res.status(500).json({
-                error: err.message,
-            });
-        }
-    },
+  getOne: asyncHandler(async (req, res) => {
+    const task = await tasksService.getTaskById(req.params.id, req.user);
+    if (!task) throw new NotFoundError('Task');
+    res.json(task);
+  }),
 
-    async getAll(req, res) {
-        try {
-            const tasks = await tasksService.getTasks(
-                req.user
-            );
+  updateStatus: asyncHandler(async (req, res) => {
+    const { status } = req.body;
+    if (!status) throw new ValidationError('status is required');
+    const task = await tasksService.updateTaskStatus(req.params.id, status, req.user);
+    if (!task) throw new NotFoundError('Task');
+    res.json(task);
+  }),
 
-            res.json(tasks);
-        } catch (err) {
-            console.error(err);
+  updateImage: asyncHandler(async (req, res) => {
+    if (!req.file) throw new ValidationError('No image file provided');
+    const updated = await tasksService.updateTaskImage(req.params.id, req.file.location, req.user);
+    if (!updated) throw new NotFoundError('Task');
+    res.json({ message: 'Image updated', imageUrl: updated.imageUrl, imageVersions: updated.imageVersions });
+  }),
 
-            res.status(500).json({
-                error: err.message,
-            });
-        }
-    },
+  update: asyncHandler(async (req, res) => {
+    const updated = await tasksService.updateTask(req.params.id, req.body, req.user);
+    if (!updated) throw new NotFoundError('Task');
+    res.json(updated);
+  }),
 
-    async getOne(req, res) {
-        try {
-            const task = await tasksService.getTaskById(
-                req.params.id
-            );
+  delete: asyncHandler(async (req, res) => {
+    await tasksService.deleteTask(req.params.id, req.user);
+    res.json({ success: true });
+  }),
 
-            if (!task) {
-                return res.status(404).json({
-                    error: 'Task not found',
-                });
-            }
+  getImageUrl: asyncHandler(async (req, res) => {
+    const task = await tasksRepository.getById(req.params.id);
+    if (!task) throw new NotFoundError('Task');
+    if (req.user.role !== 'manager' && task.teamId !== req.user.teamId) throw new ForbiddenError();
+    if (!task.imageUrl && !task.thumbnailUrl) throw new NotFoundError('Task image');
 
-            res.json(task);
-        } catch (err) {
-            console.error(err);
+    const urlOrKey = task.thumbnailUrl || task.imageUrl;
+    const bucket   = task.thumbnailUrl ? process.env.S3_RESIZED_BUCKET : process.env.S3_ORIGINALS_BUCKET;
+    const url      = await getSignedImageUrl(urlOrKey, bucket);
+    res.json({ url });
+  }),
 
-            res.status(500).json({
-                error: err.message,
-            });
-        }
-    },
+  // GET /api/tasks/:id/history — returns full audit trail for a task
+  getHistory: asyncHandler(async (req, res) => {
+    const task = await tasksRepository.getById(req.params.id);
+    if (!task) throw new NotFoundError('Task');
+    if (req.user.role !== 'manager' && task.teamId !== req.user.teamId) throw new ForbiddenError();
 
-    async updateStatus(req, res) {
-        try {
-            const task =
-                await tasksService.updateTaskStatus(
-                    req.params.id,
-                    req.body.status
-                );
-
-            res.json(task);
-        } catch (err) {
-            console.error(err);
-
-            res.status(500).json({
-                error: err.message,
-            });
-        }
-    },
-
-    async updateImage(req, res) {
-        try {
-            if (!req.file) {
-                return res.status(400).json({ message: 'No image file provided.' });
-            }
-
-            const updated = await tasksService.updateTaskImage(
-                req.params.id,
-                req.file.location,
-                req.user
-            );
-
-            if (!updated) {
-                return res.status(404).json({ message: 'Task not found.' });
-            }
-
-            res.status(200).json({
-                message: 'Task image updated.',
-                imageUrl: updated.imageUrl,
-                imageVersions: updated.imageVersions,
-            });
-        } catch (err) {
-            console.error('[Tasks] updateImage error:', err);
-            res.status(500).json({ message: 'Failed to update task image.' });
-        }
-    },
-
-    async delete(req, res) {
-        try {
-            await tasksService.deleteTask(req.params.id);
-
-            res.json({
-                success: true,
-            });
-        } catch (err) {
-            console.error(err);
-
-            res.status(500).json({
-                error: err.message,
-            });
-        }
-    },
-
-    async getImageUrl(req, res) {
-        try {
-            const task = await tasksRepository.getById(req.params.id);
-            if (!task) return res.status(404).json({ error: 'Task not found' });
-
-            const signedUrl = await getSignedImageUrl(task.imageUrl);
-            res.json({ url: signedUrl });
-        } catch (err) {
-            console.error('[Tasks] getImageUrl error:', err);
-            res.status(500).json({ error: 'Failed to generate image URL.' });
-        }
-    },
+    const history = await auditRepository.getByTaskId(req.params.id);
+    res.json(history);
+  }),
 };

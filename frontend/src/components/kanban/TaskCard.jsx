@@ -1,78 +1,114 @@
 import { useDraggable } from '@dnd-kit/core';
+import { Calendar, GripVertical } from 'lucide-react';
+import { cn, formatDeadline } from '../../lib/utils';
+import { Avatar } from '../ui/avatar';
+import { Badge } from '../ui/badge';
+
+const PRIORITY_CONFIG = {
+  HIGH:   { bar: 'bg-red-500',    badge: 'destructive' },
+  MEDIUM: { bar: 'bg-amber-500',  badge: 'warning' },
+  LOW:    { bar: 'bg-emerald-500', badge: 'success' },
+};
+
+const DEADLINE_VARIANT = {
+  overdue: 'destructive',
+  today:   'warning',
+  soon:    'warning',
+  normal:  'secondary',
+};
 
 export default function TaskCard({ task, onClick }) {
-    const { attributes, listeners, setNodeRef, transform, isDragging } =
-        useDraggable({
-            id: task.taskId,
-        });
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: task.taskId,
+  });
 
-    const style = transform
-        ? {
-            transform: `translate(${transform.x}px, ${transform.y}px)`,
-            zIndex: 50,
-            opacity: 0.9,
-        }
-        : undefined;
+  const style = transform
+    ? { transform: `translate(${transform.x}px, ${transform.y}px)`, zIndex: 999 }
+    : undefined;
 
-    const thumbnailUrl = task.presignedUrl;
+  const priority = PRIORITY_CONFIG[task.priority] || PRIORITY_CONFIG.MEDIUM;
+  const deadline = formatDeadline(task.deadline);
+  const assigneeDisplay = task.assigneeEmail
+    ? task.assigneeEmail.split('@')[0]
+    : task.assigneeName || task.assigneeId?.slice(0, 8);
 
-    return (
-        <div
-            ref={setNodeRef}
-            style={style}
-            className="bg-white rounded-xl shadow border hover:shadow-md transition-shadow"
-        >
-            {/* Drag handle — only this area triggers drag */}
-            <div
-                {...listeners}
-                {...attributes}
-                className="px-4 pt-3 pb-1 cursor-grab active:cursor-grabbing flex items-center gap-1.5"
-                title="Drag to move"
-            >
-                <svg className="w-3.5 h-3.5 text-gray-300 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <circle cx="7" cy="5" r="1.5"/>
-                    <circle cx="13" cy="5" r="1.5"/>
-                    <circle cx="7" cy="10" r="1.5"/>
-                    <circle cx="13" cy="10" r="1.5"/>
-                    <circle cx="7" cy="15" r="1.5"/>
-                    <circle cx="13" cy="15" r="1.5"/>
-                </svg>
-                <span className="text-xs text-gray-300">drag</span>
-            </div>
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'group relative bg-card rounded-xl border border-white/[0.06] overflow-hidden',
+        'hover:border-white/[0.12] hover:shadow-[0_4px_20px_rgba(0,0,0,0.4)]',
+        'transition-all duration-150 cursor-pointer select-none',
+        isDragging && 'border-primary/40 shadow-[0_8px_40px_rgba(109,94,245,0.3)] opacity-90 rotate-1 scale-[1.02]'
+      )}
+      onClick={() => !isDragging && onClick?.()}
+    >
+      {/* Priority indicator bar */}
+      <div className={cn('absolute left-0 top-0 bottom-0 w-[3px]', priority.bar)} />
 
-            {/* Clickable card body — opens modal */}
-            <div
-                onClick={() => !isDragging && onClick?.()}
-                className="px-4 pb-4 cursor-pointer"
-            >
-                {thumbnailUrl && (
-                    <img
-                        src={thumbnailUrl}
-                        alt={task.title}
-                        className="w-full h-32 object-cover rounded-lg mb-3 pointer-events-none"
-                        onError={(e) => { e.target.style.display = 'none'; }}
-                    />
-                )}
-
-                <div className="flex items-center justify-between">
-                    <h3 className="font-bold text-base text-gray-900">
-                        {task.title}
-                    </h3>
-                    <span className="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded font-medium shrink-0 ml-2">
-                        {task.priority}
-                    </span>
-                </div>
-
-                {task.description && (
-                    <p className="text-sm text-gray-500 mt-1.5 line-clamp-2">
-                        {task.description}
-                    </p>
-                )}
-
-                <div className="mt-3 text-xs text-gray-400">
-                    Assignee: {task.assigneeId}
-                </div>
-            </div>
+      <div className="pl-4 pr-3 py-3">
+        {/* Drag handle + priority row */}
+        <div className="flex items-center gap-1.5 mb-2">
+          <button
+            {...listeners}
+            {...attributes}
+            className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground cursor-grab active:cursor-grabbing p-0.5 rounded"
+            onClick={(e) => e.stopPropagation()}
+            aria-label="Drag task"
+          >
+            <GripVertical size={14} />
+          </button>
+          {task.priority && (
+            <Badge variant={priority.badge} className="text-[10px] px-1.5 py-0 leading-4">
+              {task.priority}
+            </Badge>
+          )}
         </div>
-    );
+
+        {/* Thumbnail */}
+        {task.presignedUrl && (
+          <img
+            src={task.presignedUrl}
+            alt={task.title}
+            className="w-full h-24 object-cover rounded-lg mb-2.5 pointer-events-none opacity-90"
+            onError={(e) => { e.target.style.display = 'none'; }}
+          />
+        )}
+
+        {/* Title */}
+        <h3 className="text-sm font-semibold text-foreground leading-snug line-clamp-2 mb-1">
+          {task.title}
+        </h3>
+
+        {/* Description */}
+        {task.description && (
+          <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed mb-2">
+            {task.description}
+          </p>
+        )}
+
+        {/* Footer */}
+        <div className="flex items-center justify-between gap-2 mt-2.5">
+          {/* Assignee */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Avatar name={assigneeDisplay || '?'} size="xs" />
+            <span className="text-[10px] text-muted-foreground truncate max-w-[70px]">
+              {assigneeDisplay || '—'}
+            </span>
+          </div>
+
+          {/* Deadline */}
+          {deadline && (
+            <div className="flex items-center gap-1 shrink-0">
+              <Calendar size={9} className="text-muted-foreground" />
+              <Badge variant={DEADLINE_VARIANT[deadline.variant]} className="text-[10px] px-1.5 py-0 leading-4">
+                {deadline.label}
+              </Badge>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }

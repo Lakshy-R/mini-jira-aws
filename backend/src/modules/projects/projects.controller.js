@@ -1,30 +1,29 @@
 import { projectsService } from './projects.service.js';
+import { asyncHandler } from '../../middleware/error.middleware.js';
 
 export const projectsController = {
-    async create(req, res) {
-        try {
-            const project = await projectsService.createProject(req.body, req.user);
-            res.status(201).json(project);
-        } catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    },
+  create: asyncHandler(async (req, res) => {
+    const project = await projectsService.createProject(req.body, req.user);
+    res.status(201).json(project);
+  }),
 
-    async getAll(req, res) {
-        try {
-            const projects = await projectsService.getProjects(req.user);
-            res.json(projects);
-        } catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    },
+  getAll: asyncHandler(async (req, res) => {
+    const projects = await projectsService.getProjects(req.user);
+    res.json(projects);
+  }),
 
-    async getOne(req, res) {
-        try {
-            const project = await projectsService.getProjectById(req.params.id);
-            res.json(project);
-        } catch (err) {
-            res.status(500).json({ error: err.message });
-        }
-    },
+  getOne: asyncHandler(async (req, res) => {
+    const project = await projectsService.getProjectById(req.params.id, req.user);
+    res.json(project);
+  }),
+
+  update: asyncHandler(async (req, res) => {
+    const updated = await projectsService.updateProject(req.params.id, req.body, req.user);
+    res.json(updated);
+  }),
+
+  delete: asyncHandler(async (req, res) => {
+    await projectsService.deleteProject(req.params.id, req.user);
+    res.json({ success: true });
+  }),
 };

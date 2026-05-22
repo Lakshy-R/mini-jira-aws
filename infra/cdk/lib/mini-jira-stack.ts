@@ -17,6 +17,9 @@ import * as events     from 'aws-cdk-lib/aws-events';
 import * as targets    from 'aws-cdk-lib/aws-events-targets';
 import * as logs       from 'aws-cdk-lib/aws-logs';
 import * as ssm        from 'aws-cdk-lib/aws-ssm';
+import * as cognito    from 'aws-cdk-lib/aws-cognito';
+import * as cloudwatch from 'aws-cdk-lib/aws-cloudwatch';
+import * as cwActions  from 'aws-cdk-lib/aws-cloudwatch-actions';
 import { Construct }   from 'constructs';
 import * as fs         from 'fs';
 import * as path       from 'path';
@@ -591,7 +594,203 @@ export class MiniJiraStack extends cdk.Stack {
       description:   'CloudWatch custom metrics namespace',
     });
 
-    // ─── 18. Outputs ─────────────────────────────────────────────────────────
+    // ─── 18. Cognito User Pool ───────────────────────────────────────────────
+    // Email-based sign-in, no MFA, self-registration enabled.
+    // Custom attributes: role (manager|employee) and teamId (frontend|backend).
+    // App client has no secret — the React SPA calls Cognito directly with
+    // USER_PASSWORD_AUTH and stores tokens in memory.
+
+    const userPool = new cognito.UserPool(this, 'UserPool', {
+      userPoolName:        'mini-jira-pool',
+      selfSignUpEnabled:   true,
+      signInAliases:       { email: true },
+      autoVerify:          { email: true },
+      standardAttributes: {
+        email: { required: true, mutable: false },
+      },
+      customAttributes: {
+        role:   new cognito.StringAttribute({ mutable: true }),
+        teamId: new cognito.StringAttribute({ mutable: true }),
+      },
+      passwordPolicy: {
+        minLength:        8,
+        requireLowercase: true,
+        requireUppercase: true,
+        requireDigits:    true,
+        requireSymbols:   false,
+      },
+      accountRecovery:  cognito.AccountRecovery.EMAIL_ONLY,
+      removalPolicy:    cdk.RemovalPolicy.RETAIN,
+    });
+
+    const userPoolClient = userPool.addClient('WebClient', {
+      userPoolClientName: 'mini-jira-client',
+      generateSecret:     false,
+      authFlows: {
+        userPassword:  true,
+        userSrp:       true,
+        custom:        false,
+        adminUserPassword: false,
+      },
+      accessTokenValidity:  cdk.Duration.hours(1),
+      idTokenValidity:      cdk.Duration.hours(1),
+      refreshTokenValidity: cdk.Duration.days(30),
+      preventUserExistenceErrors: true,
+    });
+
+    // Write Cognito IDs to SSM so EC2 userdata and the app can read them
+    new ssm.StringParameter(this, 'SsmCognitoPoolId', {
+      parameterName: '/mini-jira/COGNITO_USER_POOL_ID',
+      stringValue:   userPool.userPoolId,
+      description:   'Cognito User Pool ID',
+    });
+
+    new ssm.StringParameter(this, 'SsmCognitoClientId', {
+      parameterName: '/mini-jira/COGNITO_CLIENT_ID',
+      stringValue:   userPoolClient.userPoolClientId,
+      description:   'Cognito App Client ID (no secret)',
+    });
+
+    // Grant EC2 instances the ability to list Cognito users (used by backend
+    // to resolve assignee emails when creating tasks)
+    instanceRole.addToPolicy(new iam.PolicyStatement({
+      sid:       'CognitoListUsers',
+      actions:   ['cognito-idp:ListUsers', 'cognito-idp:AdminGetUser'],
+      resources: [userPool.userPoolArn],
+    }));
+
+    // ─── 19. CloudWatch Alerts SNS Topic ────────────────────────────────────
+    // Receives notifications from all three CloudWatch alarms.
+    // Add an email subscription manually after deploy (or via a CfnSubscription).
+
+    const alertsTopic = new sns.Topic(this, 'AlertsTopic', {
+      topicName:   'mini-jira-alerts',
+      displayName: 'Mini-Jira CloudWatch Alerts',
+    });
+
+    // ─── 20. CloudWatch Alarms ───────────────────────────────────────────────
+    // Alarm 1 — Overdue tasks threshold (custom metric emitted by daily-digest Lambda)
+    const overdueTasksAlarm = new cloudwatch.Alarm(this, 'OverdueTasksAlarm', {
+      alarmName:          'mini-jira-overdue-tasks',
+      alarmDescription:   'More than 5 overdue tasks detected',
+      metric: new cloudwatch.Metric({
+        namespace:  'MiniJira',
+        metricName: 'OverdueTasks',
+        statistic:  'Sum',
+        period:     cdk.Duration.days(1),
+      }),
+      threshold:                 5,
+      comparisonOperator:        cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods:         1,
+      treatMissingData:          cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    overdueTasksAlarm.addAlarmAction(new cwActions.SnsAction(alertsTopic));
+
+    // Alarm 2 — EC2 High CPU (targets both ASG instances via the ASG metric)
+    const cpuAlarm = new cloudwatch.Alarm(this, 'HighCpuAlarm', {
+      alarmName:        'mini-jira-high-cpu',
+      alarmDescription: 'EC2 ASG average CPU utilization above 80%',
+      metric: new cloudwatch.Metric({
+        namespace:  'AWS/EC2',
+        metricName: 'CPUUtilization',
+        dimensionsMap: { AutoScalingGroupName: asg.autoScalingGroupName },
+        statistic:  'Average',
+        period:     cdk.Duration.minutes(5),
+      }),
+      threshold:          80,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods:  2,
+      treatMissingData:   cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    cpuAlarm.addAlarmAction(new cwActions.SnsAction(alertsTopic));
+
+    // Alarm 3 — ALB 5xx errors
+    const alb5xxAlarm = new cloudwatch.Alarm(this, 'Alb5xxAlarm', {
+      alarmName:        'mini-jira-alb-5xx',
+      alarmDescription: 'ALB is returning 5xx errors',
+      metric: new cloudwatch.Metric({
+        namespace:  'AWS/ApplicationELB',
+        metricName: 'HTTPCode_ELB_5XX_Count',
+        dimensionsMap: {
+          LoadBalancer: alb.loadBalancerFullName,
+        },
+        statistic: 'Sum',
+        period:    cdk.Duration.minutes(5),
+      }),
+      threshold:          0,
+      comparisonOperator: cloudwatch.ComparisonOperator.GREATER_THAN_THRESHOLD,
+      evaluationPeriods:  1,
+      treatMissingData:   cloudwatch.TreatMissingData.NOT_BREACHING,
+    });
+    alb5xxAlarm.addAlarmAction(new cwActions.SnsAction(alertsTopic));
+
+    // ─── 21. CloudWatch Dashboard ────────────────────────────────────────────
+    // Four widgets matching the architecture diagram:
+    //   1. Tasks Created Per Day
+    //   2. Tasks Closed Per Day Per Team
+    //   3. Average Time-to-Close (ms)
+    //   4. EC2 CPU Utilization
+
+    const dashboard = new cloudwatch.Dashboard(this, 'Dashboard', {
+      dashboardName: 'MiniJira-Dashboard',
+    });
+
+    dashboard.addWidgets(
+      new cloudwatch.GraphWidget({
+        title:  'Tasks Created Per Day',
+        width:  12,
+        height: 6,
+        left: [new cloudwatch.Metric({
+          namespace:  'MiniJira',
+          metricName: 'TaskCreated',
+          statistic:  'Sum',
+          period:     cdk.Duration.days(1),
+        })],
+      }),
+      new cloudwatch.GraphWidget({
+        title:  'Tasks Closed Per Day Per Team',
+        width:  12,
+        height: 6,
+        left: [new cloudwatch.Metric({
+          namespace:   'MiniJira',
+          metricName:  'TaskClosed',
+          statistic:   'Sum',
+          period:      cdk.Duration.days(1),
+          // TeamId dimension is set at runtime by the backend — CloudWatch
+          // will automatically split the metric line per TeamId value
+          dimensionsMap: {},
+        })],
+      }),
+    );
+
+    dashboard.addWidgets(
+      new cloudwatch.SingleValueWidget({
+        title:  'Avg Time to Close (ms)',
+        width:  12,
+        height: 6,
+        metrics: [new cloudwatch.Metric({
+          namespace:  'MiniJira',
+          metricName: 'TimeToCloseMs',
+          statistic:  'Average',
+          period:     cdk.Duration.days(1),
+        })],
+      }),
+      new cloudwatch.GraphWidget({
+        title:  'EC2 CPU Utilization',
+        width:  12,
+        height: 6,
+        left: [new cloudwatch.Metric({
+          namespace:  'AWS/EC2',
+          metricName: 'CPUUtilization',
+          dimensionsMap: { AutoScalingGroupName: asg.autoScalingGroupName },
+          statistic:  'Average',
+          period:     cdk.Duration.minutes(5),
+        })],
+        leftYAxis: { min: 0, max: 100 },
+      }),
+    );
+
+    // ─── 22. Outputs ─────────────────────────────────────────────────────────
 
     new cdk.CfnOutput(this, 'AlbDnsName', {
       value:       alb.loadBalancerDnsName,
@@ -636,6 +835,26 @@ export class MiniJiraStack extends cdk.Stack {
     new cdk.CfnOutput(this, 'AssignmentDlqUrl', {
       value:       assignmentDlq.queueUrl,
       description: 'Dead-letter queue for failed assignment events',
+    });
+
+    new cdk.CfnOutput(this, 'UserPoolId', {
+      value:       userPool.userPoolId,
+      description: 'Cognito User Pool ID — set as COGNITO_USER_POOL_ID in .env',
+    });
+
+    new cdk.CfnOutput(this, 'UserPoolClientId', {
+      value:       userPoolClient.userPoolClientId,
+      description: 'Cognito App Client ID — set as COGNITO_CLIENT_ID in .env',
+    });
+
+    new cdk.CfnOutput(this, 'AlertsTopicArn', {
+      value:       alertsTopic.topicArn,
+      description: 'SNS topic for CloudWatch alarms — subscribe your email manually',
+    });
+
+    new cdk.CfnOutput(this, 'DashboardUrl', {
+      value:       `https://${this.region}.console.aws.amazon.com/cloudwatch/home?region=${this.region}#dashboards:name=MiniJira-Dashboard`,
+      description: 'CloudWatch dashboard URL',
     });
   }
 }

@@ -6,6 +6,9 @@ A lightweight team task-management web app (like a stripped-down Jira/Trello) fu
 ## Demo Video
 https://drive.google.com/drive/folders/1TfHhhN4RzUf6NBqF6wgGfrxZgt81R7a3?usp=sharing
 
+## CloudFront Link  
+https://d3cg7qzt5pb0l4.cloudfront.net/
+
 ## Table of Contents
 
 1. [Architecture Overview](#architecture-overview)

@@ -23,7 +23,18 @@ const app = express();
 app.use(requestId);
 
 // Security headers
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc:  ["'self'"],
+      connectSrc:  ["'self'", "https://cognito-idp.eu-north-1.amazonaws.com", "https://*.amazonaws.com"],
+      scriptSrc:   ["'self'", "'unsafe-inline'"],
+      styleSrc:    ["'self'", "'unsafe-inline'"],
+      imgSrc:      ["'self'", "data:", "blob:", "https://*.amazonaws.com"],
+      fontSrc:     ["'self'", "data:"],
+    },
+  },
+}));
 
 // CORS
 app.use(

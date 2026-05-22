@@ -1,4 +1,4 @@
-import { PutCommand, QueryCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
+import { PutCommand, GetCommand, QueryCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import { ddb } from '../../lib/dynamodb.js';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -15,9 +15,18 @@ export const commentsRepository = {
       content,
       createdAt: now,
       updatedAt: now,
+      edited: false,
     };
     await ddb.send(new PutCommand({ TableName: TABLE, Item: item }));
     return item;
+  },
+
+  // O(1) fetch by primary key — avoids loading all task comments just to check one
+  async getById(commentId) {
+    const result = await ddb.send(
+      new GetCommand({ TableName: TABLE, Key: { commentId } })
+    );
+    return result.Item || null;
   },
 
   /**
@@ -35,6 +44,24 @@ export const commentsRepository = {
       })
     );
     return result.Items || [];
+  },
+
+  async update(commentId, content) {
+    const result = await ddb.send(
+      new UpdateCommand({
+        TableName: TABLE,
+        Key: { commentId },
+        UpdateExpression: 'SET #content = :content, updatedAt = :now, edited = :edited',
+        ExpressionAttributeNames: { '#content': 'content' },
+        ExpressionAttributeValues: {
+          ':content': content,
+          ':now':     new Date().toISOString(),
+          ':edited':  true,
+        },
+        ReturnValues: 'ALL_NEW',
+      })
+    );
+    return result.Attributes;
   },
 
   async delete(commentId) {

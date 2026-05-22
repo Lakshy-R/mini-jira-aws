@@ -70,7 +70,7 @@ app.use(multerErrorHandler);
 // Serve React frontend — must come after all API routes
 const DIST = path.resolve(__dirname, '../../frontend/dist');
 app.use(express.static(DIST));
-app.get('*', (_req, res) => {
+app.get('/{*splat}', (_req, res) => {
   res.sendFile(path.join(DIST, 'index.html'));
 });
 

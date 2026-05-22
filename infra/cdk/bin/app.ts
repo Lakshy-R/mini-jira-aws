@@ -10,5 +10,7 @@ new MiniJiraStack(app, 'MiniJiraStack', {
     account: process.env.CDK_DEFAULT_ACCOUNT,
     region:  process.env.CDK_DEFAULT_REGION || 'eu-north-1',
   },
-  description: 'Mini-Jira on AWS — VPC, ALB, ASG, CloudFront, DynamoDB',
+  description:
+    'Mini-Jira on AWS — VPC · ALB · ASG · CloudFront · DynamoDB · ' +
+    'S3 (versioned) · SNS · SQS+DLQ · Lambda (resize, worker, digest) · EventBridge',
 });

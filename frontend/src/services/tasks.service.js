@@ -39,6 +39,11 @@ export const tasksService = {
     return res.data;
   },
 
+  async updateComment(taskId, commentId, content) {
+    const res = await api.patch(`/tasks/${taskId}/comments/${commentId}`, { content });
+    return res.data;
+  },
+
   async deleteComment(taskId, commentId) {
     const res = await api.delete(`/tasks/${taskId}/comments/${commentId}`);
     return res.data;

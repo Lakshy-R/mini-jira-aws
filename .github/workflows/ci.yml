@@ -11,7 +11,8 @@ env:
   AWS_REGION:   'eu-north-1'
 
 jobs:
-  # ─── Lint & Build ────────────────────────────────────────────────────────────
+  # ─── Checks (run in parallel) ────────────────────────────────────────────────
+
   lint-backend:
     name: Backend — Lint
     runs-on: ubuntu-latest
@@ -27,9 +28,30 @@ jobs:
       - run: npm ci
         working-directory: backend
 
-      # Fail on import errors or unresolved modules
-      - run: node --check src/app.js
+      - name: Syntax check (node --check)
+        run: node --check src/app.js
         working-directory: backend
+
+  cdk-synth:
+    name: CDK — Synth Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: infra/cdk/package-lock.json
+
+      - run: npm ci
+        working-directory: infra/cdk
+
+      # Synthesises the CloudFormation template without deploying.
+      # Catches TypeScript compilation errors and invalid CDK constructs.
+      - name: CDK synth
+        run: npx cdk synth --quiet
+        working-directory: infra/cdk
 
   lint-frontend:
     name: Frontend — Lint
@@ -65,10 +87,11 @@ jobs:
       - run: npm ci
         working-directory: frontend
 
-      - name: Build
+      - name: Vite build
         working-directory: frontend
         env:
-          # Vite bakes these into the bundle at build time
+          # These secrets are baked into the bundle at build time by Vite.
+          # Set them in GitHub → Settings → Secrets → Actions.
           VITE_API_URL:              ${{ secrets.VITE_API_URL }}
           VITE_COGNITO_USER_POOL_ID: ${{ secrets.VITE_COGNITO_USER_POOL_ID }}
           VITE_COGNITO_CLIENT_ID:    ${{ secrets.VITE_COGNITO_CLIENT_ID }}
@@ -80,11 +103,12 @@ jobs:
           path: frontend/dist
           retention-days: 1
 
-  # ─── Deploy (master / main only) ─────────────────────────────────────────────
+  # ─── Deploy (master / main pushes only) ──────────────────────────────────────
+
   deploy:
     name: Deploy to EC2 Fleet
     runs-on: ubuntu-latest
-    needs: [lint-backend, build-frontend]
+    needs: [lint-backend, cdk-synth, build-frontend]
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
     environment: production
 
@@ -98,14 +122,40 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region:            ${{ env.AWS_REGION }}
 
-      # Rolling deploy via SSM Run Command — no SSH, no bastion host needed.
-      # Sends a command to ALL instances in the ASG simultaneously.
-      # PM2 cluster mode keeps at least one process alive during reload.
+      # ── 1. Upload built frontend to S3 ──────────────────────────────────────
+      # EC2 instances pull from this staging prefix during deploy.
+      # The originals bucket is already accessible to the EC2 IAM role.
+      - name: Download frontend build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend/dist
+
+      - name: Stage frontend dist to S3
+        run: |
+          BUCKET=$(aws cloudformation describe-stacks \
+            --stack-name MiniJiraStack \
+            --query "Stacks[0].Outputs[?OutputKey=='OriginalsBucketName'].OutputValue" \
+            --output text)
+
+          # Long-lived cache for hashed assets (JS/CSS chunks produced by Vite)
+          aws s3 sync frontend/dist/ "s3://${BUCKET}/deployments/frontend/" \
+            --delete \
+            --exclude "index.html" \
+            --cache-control "public, max-age=31536000, immutable"
+
+          # index.html must never be cached — it references the new chunk hashes
+          aws s3 cp frontend/dist/index.html \
+            "s3://${BUCKET}/deployments/frontend/index.html" \
+            --cache-control "no-cache, no-store, must-revalidate"
+
+          echo "ORIGINALS_BUCKET=${BUCKET}" >> "$GITHUB_ENV"
+
+      # ── 2. Rolling backend + frontend deploy via SSM ─────────────────────────
+      # No SSH or bastion needed. SSM Run Command reaches all ASG instances.
+      # PM2 cluster mode keeps ≥1 process alive during reload.
       - name: Rolling deploy via SSM Run Command
         run: |
-          ASG_NAME="MiniJiraStack-Asg*"
-
-          # Discover instance IDs from the ASG
           INSTANCE_IDS=$(aws autoscaling describe-auto-scaling-groups \
             --query "AutoScalingGroups[?contains(AutoScalingGroupName,'MiniJiraStack-Asg')].Instances[*].InstanceId" \
             --output text)
@@ -120,25 +170,38 @@ jobs:
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids $INSTANCE_IDS \
             --document-name "AWS-RunShellScript" \
-            --parameters 'commands=[
+            --parameters commands='[
+              "set -e",
               "cd /home/ec2-user/mini-jira-aws",
               "git fetch origin master",
               "git reset --hard origin/master",
-              "cd backend && npm ci --omit=dev",
+              "cd backend && npm ci --omit=dev && cd ..",
+              "BUCKET=$(aws ssm get-parameter --name /mini-jira/S3_ORIGINALS_BUCKET --query Parameter.Value --output text)",
+              "aws s3 sync s3://${BUCKET}/deployments/frontend/ /home/ec2-user/mini-jira-aws/frontend/dist/ --delete",
               "pm2 reload backend --update-env"
             ]' \
             --output text \
             --query "Command.CommandId")
 
           echo "SSM Command ID: $COMMAND_ID"
-          echo "Waiting for command to complete..."
+          echo "Waiting for command to complete on first instance..."
 
           aws ssm wait command-executed \
             --command-id "$COMMAND_ID" \
-            --instance-id $(echo $INSTANCE_IDS | awk '{print $1}')
+            --instance-id "$(echo "$INSTANCE_IDS" | awk '{print $1}')"
 
-          echo "Deploy complete."
+          STATUS=$(aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "$(echo "$INSTANCE_IDS" | awk '{print $1}')" \
+            --query "StatusDetails" \
+            --output text)
 
+          echo "Deploy status: $STATUS"
+          [ "$STATUS" = "Success" ] || exit 1
+
+      # ── 3. Invalidate CloudFront ─────────────────────────────────────────────
+      # Flushes cached HTML, JS, and CSS across all edge PoPs so users
+      # immediately receive the new bundle without hard-refreshing.
       - name: Invalidate CloudFront cache
         run: |
           DIST_ID=$(aws cloudformation describe-stacks \
@@ -150,5 +213,7 @@ jobs:
             aws cloudfront create-invalidation \
               --distribution-id "$DIST_ID" \
               --paths "/*"
-            echo "CloudFront invalidation submitted for $DIST_ID"
+            echo "CloudFront invalidation submitted for distribution $DIST_ID"
+          else
+            echo "DistributionId output not found — skipping invalidation"
           fi

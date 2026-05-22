@@ -31,11 +31,24 @@ export const commentsService = {
     return commentsRepository.getByTaskId(taskId);
   },
 
+  async updateComment(commentId, taskId, content, user) {
+    await assertTaskAccess(taskId, user);
+
+    // O(1) direct fetch — no N+1 scan across all task comments
+    const comment = await commentsRepository.getById(commentId);
+    if (!comment) throw new NotFoundError('Comment');
+
+    // Only the original author may edit — managers cannot rewrite other people's comments
+    if (comment.authorId !== user.sub) throw new ForbiddenError('Only the comment author can edit it');
+
+    return commentsRepository.update(commentId, content.trim());
+  },
+
   async deleteComment(commentId, taskId, user) {
     await assertTaskAccess(taskId, user);
 
-    const comments = await commentsRepository.getByTaskId(taskId);
-    const comment  = comments.find((c) => c.commentId === commentId);
+    // O(1) direct fetch — fixed N+1 that previously loaded all task comments
+    const comment = await commentsRepository.getById(commentId);
     if (!comment) throw new NotFoundError('Comment');
 
     if (user.role !== 'manager' && comment.authorId !== user.sub) {
